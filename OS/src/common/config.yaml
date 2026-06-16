@@ -1,0 +1,129 @@
+# =============================================================================
+# MAGI OS — Master Configuration
+# /opt/magi/config/config.yaml
+# =============================================================================
+
+system:
+  name: "MAGI-NODE"
+  version: "1.0.0"
+  log_level: "INFO"           # DEBUG | INFO | WARNING | ERROR
+  log_dir: "/opt/magi/logs"
+
+# ── CPU Core Pinning ─────────────────────────────────────
+cpu:
+  core_os: 0                  # Core 0 reserved for OS + sensor hub
+  core_magi1: 1               # Melchior — detection
+  core_magi2: 2               # Balthasar — analysis
+  core_magi3: 3               # Caspar — fusion/decision
+
+# ── IPC Settings ─────────────────────────────────────────
+ipc:
+  base_path: "ipc:///tmp/magi"
+  sensor_pub: "ipc:///tmp/magi/sensor_pub.sock"
+  magi1_result: "ipc:///tmp/magi/magi1_result.sock"
+  magi2_result: "ipc:///tmp/magi/magi2_result.sock"
+  magi3_decision: "ipc:///tmp/magi/magi3_decision.sock"
+  heartbeat: "ipc:///tmp/magi/heartbeat.sock"
+  shm_camera: "/magi_camera_frame"    # POSIX shared memory name
+  shm_camera_size: 4194304            # 4 MB (e.g. 1280x720 RGB)
+
+# ── Sensor Configuration ─────────────────────────────────
+sensors:
+  poll_rate_hz: 50            # Sensor hub polling rate
+
+  i2c:
+    bus: 1                    # /dev/i2c-1
+    devices:
+      - name: "imu"
+        address: 0x68         # MPU-6050 / MPU-9250
+        enabled: true
+      - name: "barometer"
+        address: 0x76         # BMP280
+        enabled: false
+      - name: "tof_front"
+        address: 0x29         # VL53L0X
+        enabled: false
+
+  spi:
+    bus: 0
+    devices:
+      - name: "adc"
+        chip_select: 0        # /dev/spidev0.0 — MCP3208
+        speed_hz: 1000000
+        enabled: false
+
+  uart:
+    - name: "gps"
+      port: "/dev/ttyAMA0"
+      baud: 9600
+      enabled: false
+    - name: "telemetry"
+      port: "/dev/ttyUSB0"
+      baud: 115200
+      enabled: false
+
+  gpio:
+    - name: "trigger_in"
+      pin: 17                 # BCM pin
+      mode: "input"
+      pull: "up"
+      interrupt: "falling"
+      enabled: true
+    - name: "status_led"
+      pin: 27
+      mode: "output"
+      enabled: true
+    - name: "alert_out"
+      pin: 22
+      mode: "output"
+      enabled: true
+
+# ── Model Configuration ───────────────────────────────────
+models:
+  magi1:
+    name: "Melchior"
+    role: "detection"
+    path: "/opt/magi/models/melchior.tflite"
+    input_size: [320, 320]    # width x height
+    input_dtype: "float32"
+    confidence_threshold: 0.5
+    nms_threshold: 0.4
+    num_threads: 1             # 1 thread per model (core-pinned)
+    use_xnnpack: true
+    inference_timeout_ms: 200
+
+  magi2:
+    name: "Balthasar"
+    role: "analysis"
+    path: "/opt/magi/models/balthasar.tflite"
+    input_size: [224, 224]
+    input_dtype: "float32"
+    num_threads: 1
+    use_xnnpack: true
+    inference_timeout_ms: 150
+
+  magi3:
+    name: "Caspar"
+    role: "fusion"
+    path: "/opt/magi/models/caspar.tflite"
+    input_size: [128]          # 1D — sensor + result vector
+    input_dtype: "float32"
+    num_threads: 1
+    use_xnnpack: true
+    inference_timeout_ms: 50
+
+# ── Camera ───────────────────────────────────────────────
+camera:
+  enabled: false
+  source: 0                   # /dev/video0
+  width: 640
+  height: 480
+  fps: 30
+  format: "BGR"
+
+# ── Output / Action ──────────────────────────────────────
+output:
+  uart_telemetry: false       # Send decisions over UART
+  gpio_alert: true            # Pulse alert_out GPIO on detection
+  log_detections: true
+  log_file: "/opt/magi/logs/detections.log"

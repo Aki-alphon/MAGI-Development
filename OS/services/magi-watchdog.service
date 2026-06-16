@@ -1,0 +1,25 @@
+[Unit]
+Description=MAGI Watchdog — Manages all MAGI inference nodes
+After=network.target pigpiod.service
+Wants=pigpiod.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/magi
+Environment=PYTHONPATH=/opt/magi/src
+ExecStartPre=/bin/mkdir -p /tmp/magi
+ExecStartPre=/bin/chmod 777 /tmp/magi
+ExecStart=/opt/magi/venv/bin/python3 /opt/magi/src/watchdog.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=magi-watchdog
+
+# Resource limits
+LimitNOFILE=65536
+OOMScoreAdjust=-900
+
+[Install]
+WantedBy=multi-user.target

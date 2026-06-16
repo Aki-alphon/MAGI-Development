@@ -1,0 +1,204 @@
+services:
+
+  # ── Message Bus (Broker) ──────────────────────────────────────────────────
+  message_bus:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_message_bus
+    command: ["message_bus"]
+    volumes:
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    restart: unless-stopped
+
+  # ── Parameter Server ──────────────────────────────────────────────────────
+  param_server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_param_server
+    command: ["param_server"]
+    volumes:
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - message_bus
+    restart: unless-stopped
+
+  # ── Sensor Hub ────────────────────────────────────────────────────────────
+  sensor_hub:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_sensor_hub
+    command: ["sensor_hub"]
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - message_bus
+      - param_server
+    restart: unless-stopped
+
+  # ── Camera Capture ───────────────────────────────────────────────────────
+  camera:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_camera
+    command: ["camera"]
+    volumes:
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - sensor_hub
+    restart: "no"
+
+  # ── MAGI-1 Melchior ───────────────────────────────────────────────────────
+  magi1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi1_melchior
+    command: ["magi1"]
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - sensor_hub
+    restart: unless-stopped
+
+  # ── MAGI-2 Balthasar ──────────────────────────────────────────────────────
+  magi2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi2_balthasar
+    command: ["magi2"]
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - sensor_hub
+    restart: unless-stopped
+
+  # ── MAGI-3 Caspar ─────────────────────────────────────────────────────────
+  magi3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi3_caspar
+    command: ["magi3"]
+    ports:
+      - "5558:5558"     # Expose decision PUB socket
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - magi1
+      - magi2
+    restart: unless-stopped
+
+  # ── Batch Manager ─────────────────────────────────────────────────────────
+  batch_manager:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_batch_manager
+    command: ["batch_manager"]
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - message_bus
+    restart: unless-stopped
+
+  # ── Telemetry Dashboard ───────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_dashboard
+    command: ["dashboard"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - message_bus
+      - param_server
+    restart: unless-stopped
+
+  # ── Status Monitor (optional, interactive) ─────────────────────────────────
+  monitor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: magi_monitor
+    command: ["monitor"]
+    volumes:
+      - magi_logs:/opt/magi/logs
+      - magi_ipc:/tmp/magi
+    environment:
+      - PYTHONPATH=/opt/magi/src:/opt/magi/mock_hardware
+      - MAGI_ENV=docker
+    networks:
+      - magi_net
+    depends_on:
+      - magi3
+    stdin_open: true
+    tty: true
+    profiles:
+      - monitor    # Only starts with: docker compose --profile monitor up
+
+volumes:
+  magi_logs:
+  magi_ipc:
+
+networks:
+  magi_net:
+    driver: bridge

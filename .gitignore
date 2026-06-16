@@ -1,0 +1,45 @@
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# PlatformIO & IDEs
+.pio/
+.vscode/
+*.o
+*.elf
+*.hex
+*.bin
+*.su
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Large media files
+*.mp4
+*.avi
+*.mov
+
+# Archive files
+*.zip
+*.rar
+*.tar.gz
+*.7z
+
+# Mathworks Simscape simulation project (External)
+mathworks-Simscape-Robot-4Legs-26.1.2.7/
+mathworks-Simscape-Robot-4Legs-26.1.2.7.zip
+
+# HeatMAP temporary/converted files
+HeatMAP/vertopal.com_Heatmap_algo.doc
+
+# Firmware test project
+firmware/pca9685_test/
+
+# Exclude all files in 'model &miscellenious' EXCEPT for 'MAGI.3mf/' and 'README.md'
+model &miscellenious/*
+!model &miscellenious/MAGI.3mf/
+!model &miscellenious/README.md

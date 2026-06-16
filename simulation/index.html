@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAGI: Quadruped Locomotion & Decision Simulator</title>
+    <meta name="description" content="MAGI OS — real-time 12-DOF quadruped walking simulation with Bézier gait trajectories, reinforcement learning training, neural network policy, and MAGI-3 Caspar decision fusion.">
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <!-- Three.js (local) -->
+    <script src="lib/three.min.js"></script>
+    <script src="lib/OrbitControls.js"></script>
+    <!-- Chart.js (local) -->
+    <script src="lib/chart.min.js"></script>
+</head>
+<body>
+    <div class="glow-bg"></div>
+
+    <!-- ======================================================
+         HEADER
+         ====================================================== -->
+    <header class="main-header">
+        <div class="header-logo">
+            <span class="logo-magi">MAGI</span>
+            <span class="logo-sub">SYSTEM CONTROL — LOCOMOTION OS v3.0</span>
+        </div>
+        <div class="system-status">
+            <div class="status-node" id="node-melchior">
+                <span class="node-dot ok"></span> MELCHIOR <span class="node-state">10 Hz</span>
+            </div>
+            <div class="status-node" id="node-balthasar">
+                <span class="node-dot ok"></span> BALTHASAR <span class="node-state">15 Hz</span>
+            </div>
+            <div class="status-node" id="node-caspar">
+                <span class="node-dot ok"></span> CASPAR <span class="node-state">50 Hz</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+
+        <!-- =====================================================
+             SIDEBAR
+             ===================================================== -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <button class="nav-btn active" onclick="switchTab('simulation')">
+                    <span class="nav-icon">🤖</span> Locomotion Sim
+                </button>
+                <button class="nav-btn" onclick="switchTab('training')">
+                    <span class="nav-icon">🧠</span> RL Gait Training
+                </button>
+                <button class="nav-btn" onclick="switchTab('fusion')">
+                    <span class="nav-icon">⚡</span> Decision Fusion
+                </button>
+                <button class="nav-btn" onclick="switchTab('analysis')">
+                    <span class="nav-icon">📊</span> Gait Analysis
+                </button>
+                <button class="nav-btn" onclick="switchTab('math')">
+                    <span class="nav-icon">📐</span> Kinematics Math
+                </button>
+            </nav>
+
+            <!-- Phase Diagram — always visible in sidebar -->
+            <div class="sidebar-phase-box">
+                <div class="sidebar-phase-title">GAIT PHASE DIAGRAM</div>
+                <canvas id="phase-canvas" width="220" height="88"></canvas>
+            </div>
+
+            <div class="sidebar-footer">
+                <p>MAGI OS v3.0</p>
+                <p class="target-device">RPi 4B · 12-DOF Quadruped</p>
+            </div>
+        </aside>
+
+        <!-- =====================================================
+             MAIN WORKSPACE
+             ===================================================== -->
+        <main class="workspace">
+
+            <!-- ================================================
+                 TAB 1: LOCOMOTION SIMULATOR
+                 ================================================ -->
+            <section id="tab-simulation" class="tab-content active">
+                <div class="grid-layout sim-grid">
+
+                    <!-- Left: Control Panel -->
+                    <div class="card control-card">
+                        <div class="card-header">Gait &amp; Body Controller</div>
+
+                        <div class="control-group">
+                            <label>Locomotion Mode</label>
+                            <div class="btn-toggle-group gait-btn-group">
+                                <button id="gait-crawl"  class="toggle-btn active" onclick="setGait('crawl')">Static Crawl</button>
+                                <button id="gait-trot"   class="toggle-btn" onclick="setGait('trot')">Trot</button>
+                                <button id="gait-gallop" class="toggle-btn" onclick="setGait('gallop')">Gallop</button>
+                                <button id="gait-bound"  class="toggle-btn" onclick="setGait('bound')">Bound</button>
+                                <button id="gait-stand"  class="toggle-btn" onclick="setGait('stand')">Stand</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Gait Frequency</span>
+                                <span id="val-frequency">1.5 Hz</span>
+                            </div>
+                            <input type="range" id="slider-frequency" min="0.2" max="4.0" step="0.1" value="1.5"
+                                   oninput="updateGaitParam('frequency', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Step Stride Length</span>
+                                <span id="val-stride">60 mm</span>
+                            </div>
+                            <input type="range" id="slider-stride" min="10" max="140" step="5" value="60"
+                                   oninput="updateGaitParam('stride', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Velocity X (Forward)</span>
+                                <span id="val-target-vx">1.0</span>
+                            </div>
+                            <input type="range" id="slider-target-vx" min="-1.0" max="1.0" step="0.1" value="1.0"
+                                   oninput="updateGaitParam('targetVx', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Velocity Z (Lateral)</span>
+                                <span id="val-target-vz">0.0</span>
+                            </div>
+                            <input type="range" id="slider-target-vz" min="-1.0" max="1.0" step="0.1" value="0.0"
+                                   oninput="updateGaitParam('targetVz', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Yaw Rate (Turn)</span>
+                                <span id="val-target-yaw-rate">0.0</span>
+                            </div>
+                            <input type="range" id="slider-target-yaw-rate" min="-1.0" max="1.0" step="0.1" value="0.0"
+                                   oninput="updateGaitParam('targetYawRate', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Step Height (Clearance)</span>
+                                <span id="val-step-height">30 mm</span>
+                            </div>
+                            <input type="range" id="slider-step-height" min="5" max="70" step="2" value="30"
+                                   oninput="updateGaitParam('stepHeight', this.value)">
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Body Height (Z-offset)</span>
+                                <span id="val-body-z">150 mm</span>
+                            </div>
+                            <input type="range" id="slider-body-z" min="90" max="210" step="5" value="150"
+                                   oninput="updateBodyParam('z', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Body Tilt (Pitch)</span>
+                                <span id="val-body-pitch">0°</span>
+                            </div>
+                            <input type="range" id="slider-body-pitch" min="-20" max="20" step="1" value="0"
+                                   oninput="updateBodyParam('pitch', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Body Roll</span>
+                                <span id="val-body-roll">0°</span>
+                            </div>
+                            <input type="range" id="slider-body-roll" min="-20" max="20" step="1" value="0"
+                                   oninput="updateBodyParam('roll', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Terrain Roughness</span>
+                                <span id="val-terrain-amp">0 mm</span>
+                            </div>
+                            <input type="range" id="slider-terrain-amp" min="0" max="25" step="1" value="0"
+                                   oninput="setTerrainRoughness(this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="check-support-poly" checked
+                                       onchange="toggleSupportPolygon(this.checked)">
+                                <span class="checkmark"></span>
+                                Show Support Polygon &amp; CoM
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Centre: 3D Viewport -->
+                    <div class="card viewport-card">
+                        <div class="card-header">
+                            <span>3D Telemetry Viewport</span>
+                            <span class="running-indicator">
+                                <span class="pulse-dot"></span> SIMULATOR ACTIVE
+                            </span>
+                        </div>
+                        <div id="canvas-container" style="width:100%;height:480px;background:#09090c;"></div>
+                    </div>
+
+                    <!-- Right: Telemetry -->
+                    <div class="card telemetry-card">
+                        <div class="card-header">Live 12-DOF Joint Angles</div>
+                        <div class="servos-grid">
+                            <!-- Leg 1 FR -->
+                            <div class="leg-telemetry-box" id="telemetry-l1">
+                                <div class="leg-title">LEG 1 (FR)</div>
+                                <div class="servo-row"><span>Coxa:</span>  <span class="servo-val" id="val-l1-coxa">90°</span></div>
+                                <div class="servo-row"><span>Femur:</span> <span class="servo-val" id="val-l1-femur">45°</span></div>
+                                <div class="servo-row"><span>Tibia:</span> <span class="servo-val" id="val-l1-tibia">90°</span></div>
+                            </div>
+                            <!-- Leg 2 FL -->
+                            <div class="leg-telemetry-box" id="telemetry-l2">
+                                <div class="leg-title">LEG 2 (FL)</div>
+                                <div class="servo-row"><span>Coxa:</span>  <span class="servo-val" id="val-l2-coxa">90°</span></div>
+                                <div class="servo-row"><span>Femur:</span> <span class="servo-val" id="val-l2-femur">45°</span></div>
+                                <div class="servo-row"><span>Tibia:</span> <span class="servo-val" id="val-l2-tibia">90°</span></div>
+                            </div>
+                            <!-- Leg 3 BR -->
+                            <div class="leg-telemetry-box" id="telemetry-l3">
+                                <div class="leg-title">LEG 3 (BR)</div>
+                                <div class="servo-row"><span>Coxa:</span>  <span class="servo-val" id="val-l3-coxa">90°</span></div>
+                                <div class="servo-row"><span>Femur:</span> <span class="servo-val" id="val-l3-femur">45°</span></div>
+                                <div class="servo-row"><span>Tibia:</span> <span class="servo-val" id="val-l3-tibia">90°</span></div>
+                            </div>
+                            <!-- Leg 4 BL -->
+                            <div class="leg-telemetry-box" id="telemetry-l4">
+                                <div class="leg-title">LEG 4 (BL)</div>
+                                <div class="servo-row"><span>Coxa:</span>  <span class="servo-val" id="val-l4-coxa">90°</span></div>
+                                <div class="servo-row"><span>Femur:</span> <span class="servo-val" id="val-l4-femur">45°</span></div>
+                                <div class="servo-row"><span>Tibia:</span> <span class="servo-val" id="val-l4-tibia">90°</span></div>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Chassis IMU Feedback</div>
+                        <div class="imu-display">
+                            <div class="imu-item">
+                                <span class="imu-label">Pitch</span>
+                                <span class="imu-value" id="val-imu-pitch">0.00°</span>
+                            </div>
+                            <div class="imu-item">
+                                <span class="imu-label">Roll</span>
+                                <span class="imu-value" id="val-imu-roll">0.00°</span>
+                            </div>
+                            <div class="imu-item">
+                                <span class="imu-label">Acc Z</span>
+                                <span class="imu-value" id="val-imu-accz">1.00g</span>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Gait Leg Sequence</div>
+                        <div class="gait-legend">
+                            <div class="legend-item"><span class="legend-dot swing-dot"></span> Swing phase</div>
+                            <div class="legend-item"><span class="legend-dot stance-dot"></span> Stance phase</div>
+                        </div>
+                        <div class="gait-type-info" id="gait-type-badge">CRAWL — Bézier Arc</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================
+                 TAB 2: RL TRAINING
+                 ================================================ -->
+            <section id="tab-training" class="tab-content">
+                <div class="grid-layout training-grid">
+
+                    <!-- Left: Training Controls -->
+                    <div class="card control-card">
+                        <div class="card-header">
+                            RL Training Controls
+                            <span id="curriculum-badge" class="curriculum-lbl">LVL 1</span>
+                        </div>
+
+                        <div class="control-group">
+                            <label>Simulation Speed</label>
+                            <div class="btn-toggle-group">
+                                <button id="speed-1x"  class="toggle-btn active" onclick="setTrainingSpeed(1)">1× RT</button>
+                                <button id="speed-5x"  class="toggle-btn" onclick="setTrainingSpeed(5)">5×</button>
+                                <button id="speed-25x" class="toggle-btn" onclick="setTrainingSpeed(25)">25×</button>
+                                <button id="speed-max" class="toggle-btn" onclick="setTrainingSpeed(100)">100× Turbo</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Population Size</span>
+                                <span id="val-pop-size">30</span>
+                            </div>
+                            <input type="range" id="slider-pop-size" min="10" max="100" step="5" value="30"
+                                   oninput="document.getElementById('val-pop-size').innerText=this.value"
+                                   onchange="resetTraining()">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Mutation Rate</span>
+                                <span id="val-mutation-rate">15%</span>
+                            </div>
+                            <input type="range" id="slider-mutation-rate" min="1" max="50" step="1" value="15"
+                                   oninput="document.getElementById('val-mutation-rate').innerText=this.value+'%'; if(rlTrainer) rlTrainer.mutationRate=this.value/100">
+                        </div>
+
+                        <div class="control-group">
+                            <label>Target Terrain Friction</label>
+                            <select id="select-terrain" class="custom-select" onchange="updateTerrainType(this.value)">
+                                <option value="soil">Loose Soil (Medium Grip)</option>
+                                <option value="sand">Sand (Low Grip)</option>
+                                <option value="rock">Rock / Firm Mud (High Grip)</option>
+                            </select>
+                        </div>
+
+                        <!-- NN Policy toggle -->
+                        <div class="control-group nn-toggle-row">
+                            <label>Policy Mode</label>
+                            <div class="nn-toggle-group">
+                                <button class="toggle-btn active" onclick="setNNMode(false)">Direct Gene</button>
+                                <button class="toggle-btn" onclick="setNNMode(true)">
+                                    🧬 NNPolicy <span id="nn-mode-badge" class="nn-badge">DirectGene</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="btn-row">
+                            <button id="btn-train-start" class="btn primary-btn" onclick="toggleTraining()">Start RL Training</button>
+                            <button class="btn secondary-btn" onclick="resetTraining()">Reset</button>
+                        </div>
+                        <div class="btn-row">
+                            <button class="btn export-btn" onclick="exportGenome()">📋 Export Best Genome</button>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <!-- Agent progress bar -->
+                        <div class="agent-progress-wrap">
+                            <div class="agent-progress-bar-bg">
+                                <div id="agent-progress-bar" class="agent-progress-bar" style="width:0%"></div>
+                            </div>
+                            <div id="agent-progress-lbl" class="agent-progress-lbl">Agent — / —</div>
+                        </div>
+
+                        <div class="rl-stats-box">
+                            <div class="rl-stat-row"><span>Generation:</span>      <strong id="val-gen">0</strong></div>
+                            <div class="rl-stat-row"><span>Current Agent:</span>   <strong id="val-best-id">-</strong></div>
+                            <div class="rl-stat-row"><span>Best Fitness:</span>    <strong id="val-best-fitness">0.00</strong></div>
+                            <div class="rl-stat-row"><span>Avg Velocity:</span>    <strong id="val-avg-vel">0.0 mm/s</strong></div>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Live Fitness Breakdown</div>
+                        <div class="rl-stats-box">
+                            <div class="rl-stat-row"><span>🏃 Velocity:</span>    <strong id="live-vel">—</strong></div>
+                            <div class="rl-stat-row"><span>⚖️ Stability pen:</span><strong id="live-stab">—</strong></div>
+                            <div class="rl-stat-row"><span>⚡ Energy pen:</span>  <strong id="live-nrg">—</strong></div>
+                            <div class="rl-stat-row"><span>🔁 Symmetry:</span>    <strong id="live-sym">—</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Centre: Training Sandbox viewport -->
+                    <div class="card viewport-card">
+                        <div class="card-header">
+                            <span>Training Sandbox (Fast-Forward Simulation)</span>
+                            <span id="train-status-badge" class="badge idle">IDLE</span>
+                        </div>
+                        <div id="train-canvas-container" style="width:100%;height:480px;background:#09090c;"></div>
+                    </div>
+
+                    <!-- Right: Reward chart + Gene chromosome -->
+                    <div class="card chart-card">
+                        <div class="card-header">RL Convergence &amp; Fitness Curve</div>
+                        <div class="chart-container">
+                            <canvas id="reward-chart"></canvas>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Best Agent Genome (16 Genes)</div>
+                        <canvas id="gene-canvas" width="460" height="90" class="gene-canvas"></canvas>
+
+                        <div class="divider"></div>
+                        <div class="reward-breakdown">
+                            <div class="card-sub-header">Reward Components</div>
+                            <ul class="metric-bullets">
+                                <li><strong>Forward Velocity:</strong> +phase-match × stride gain</li>
+                                <li><strong>Stability penalty:</strong> −3.5 × (|pitch| + |roll|)</li>
+                                <li><strong>Energy penalty:</strong> −0.08 × Σ(Δjoint²)</li>
+                                <li><strong>Symmetry bonus:</strong> +5 × L/R phase balance</li>
+                                <li><strong>Curriculum:</strong> stride range auto-scales up to LVL 5</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================
+                 TAB 3: DECISION FUSION
+                 ================================================ -->
+            <section id="tab-fusion" class="tab-content">
+                <div class="grid-layout fusion-grid">
+
+                    <!-- Scenario Injector -->
+                    <div class="card control-card">
+                        <div class="card-header">Inject Environmental Scenarios</div>
+                        <p class="help-text">Simulate sensor signals and observe how Caspar (MAGI-3) overrides physical gait.</p>
+
+                        <div class="scenario-buttons">
+                            <button class="scenario-btn active" id="scen-clear" onclick="setScenario('clear')">
+                                <span class="scen-icon">🌾</span>
+                                <div class="scen-text">
+                                    <strong>Clear Path (Normal)</strong>
+                                    <span>ToF: 600mm · Anomaly: 0.12</span>
+                                </div>
+                            </button>
+                            <button class="scenario-btn" id="scen-obstacle" onclick="setScenario('obstacle')">
+                                <span class="scen-icon">🧱</span>
+                                <div class="scen-text">
+                                    <strong>Close Obstacle</strong>
+                                    <span>ToF: 150mm — Immediate HALT</span>
+                                </div>
+                            </button>
+                            <button class="scenario-btn" id="scen-intruder" onclick="setScenario('intruder')">
+                                <span class="scen-icon">👤</span>
+                                <div class="scen-text">
+                                    <strong>Intruder in Zone</strong>
+                                    <span>Balthasar: Restricted · Melchior: Person</span>
+                                </div>
+                            </button>
+                            <button class="scenario-btn" id="scen-anomaly" onclick="setScenario('anomaly')">
+                                <span class="scen-icon">⚠️</span>
+                                <div class="scen-text">
+                                    <strong>High Anomaly</strong>
+                                    <span>Score: 0.85 — Cautious Crawl</span>
+                                </div>
+                            </button>
+                            <button class="scenario-btn" id="scen-target" onclick="setScenario('target')">
+                                <span class="scen-icon">🎯</span>
+                                <div class="scen-text">
+                                    <strong>Weed Target Identified</strong>
+                                    <span>Melchior: Weed 89% — TRACK</span>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Live Sensor Overrides</div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Front ToF Distance</span>
+                                <span id="val-override-tof">600 mm</span>
+                            </div>
+                            <input type="range" id="override-tof" min="50" max="1000" step="10" value="600"
+                                   oninput="overrideSensor('tof', this.value)">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <span>Scene Anomaly Score</span>
+                                <span id="val-override-anomaly">0.12</span>
+                            </div>
+                            <input type="range" id="override-anomaly" min="0" max="1" step="0.05" value="0.12"
+                                   oninput="overrideSensor('anomaly', this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Decision pipeline diagram -->
+                    <div class="card decision-board-card">
+                        <div class="card-header">MAGI Decision Pipeline Diagram</div>
+                        <div class="pipeline-visual">
+                            <div class="node-column">
+                                <div class="pipe-node" id="pipe-sensors">
+                                    <div class="pipe-node-title">Sensor Hub</div>
+                                    <div class="pipe-node-body" id="pipe-sensors-body">ToF: 600mm<br>GPIO Trg: False</div>
+                                </div>
+                                <div class="pipe-node" id="pipe-melchior">
+                                    <div class="pipe-node-title">Melchior (MAGI-1)</div>
+                                    <div class="pipe-node-body" id="pipe-melchior-body">No targets (0.0s)</div>
+                                </div>
+                                <div class="pipe-node" id="pipe-balthasar">
+                                    <div class="pipe-node-title">Balthasar (MAGI-2)</div>
+                                    <div class="pipe-node-body" id="pipe-balthasar-body">Scene: normal<br>Anomaly: 0.12</div>
+                                </div>
+                            </div>
+
+                            <div class="node-arrow">🠖</div>
+
+                            <div class="node-column center-column">
+                                <div class="pipe-node fusion-active" id="pipe-caspar">
+                                    <div class="pipe-node-title">Caspar (MAGI-3)</div>
+                                    <div class="pipe-node-body">
+                                        <strong>Priority Logic Evaluator</strong>
+                                        <div class="rule-list">
+                                            <div class="rule-item" id="rule-1">P10: ToF &lt; 200mm → HALT</div>
+                                            <div class="rule-item" id="rule-2">P9: GPIO Trigger → HALT</div>
+                                            <div class="rule-item" id="rule-3">P8: Person in Zone → HALT</div>
+                                            <div class="rule-item" id="rule-4">P6: Anomaly &gt; 0.70 → ALERT</div>
+                                            <div class="rule-item" id="rule-5">P4: Detections → TRACK</div>
+                                            <div class="rule-item" id="rule-default">P0: Idle / Forward Walk</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="node-arrow">🠖</div>
+
+                            <div class="node-column">
+                                <div class="pipe-node action-out" id="pipe-decision">
+                                    <div class="pipe-node-title">Decision Output</div>
+                                    <div class="decision-badge" id="val-decision-badge">IDLE</div>
+                                    <div class="decision-reason" id="val-decision-reason">No significant events</div>
+                                </div>
+                                <div class="pipe-node action-out" id="pipe-gait-override">
+                                    <div class="pipe-node-title">Gait Override</div>
+                                    <div class="gait-override-state" id="val-gait-override-state">NOMINAL WALKING</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Caspar console log -->
+                    <div class="card log-card">
+                        <div class="card-header">Caspar (MAGI-3) Terminal Console</div>
+                        <div class="terminal-log" id="caspar-console">
+                            <span class="log-line">[SYSTEM] Caspar Node configured. CPU affinity pinned to Core 3.</span>
+                            <span class="log-line">[SYSTEM] Subscribed: /sensors · /detections · /scene</span>
+                            <span class="log-line">[DECISION] Decision loop active. State: IDLE</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================
+                 TAB 4: GAIT ANALYSIS (NEW)
+                 ================================================ -->
+            <section id="tab-analysis" class="tab-content">
+                <div class="grid-layout analysis-grid">
+
+                    <!-- Left: Gait Stats -->
+                    <div class="card control-card">
+                        <div class="card-header">Gait Performance Metrics</div>
+
+                        <div class="ga-stats-grid">
+                            <div class="ga-stat-block">
+                                <div class="ga-stat-label">Gait Type</div>
+                                <div class="ga-stat-value" id="ga-gait-type">CRAWL</div>
+                            </div>
+                            <div class="ga-stat-block">
+                                <div class="ga-stat-label">Frequency</div>
+                                <div class="ga-stat-value" id="ga-frequency">1.5 Hz</div>
+                            </div>
+                            <div class="ga-stat-block">
+                                <div class="ga-stat-label">Stride</div>
+                                <div class="ga-stat-value" id="ga-stride">60 mm</div>
+                            </div>
+                            <div class="ga-stat-block">
+                                <div class="ga-stat-label">Step Height</div>
+                                <div class="ga-stat-value" id="ga-step-height">30 mm</div>
+                            </div>
+                            <div class="ga-stat-block highlight">
+                                <div class="ga-stat-label">Stride Efficiency</div>
+                                <div class="ga-stat-value green" id="ga-stride-eff">0.0 mm/s</div>
+                            </div>
+                            <div class="ga-stat-block highlight">
+                                <div class="ga-stat-label">Cumul. Energy</div>
+                                <div class="ga-stat-value orange" id="ga-energy">0.00</div>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Gait Sequence Definitions</div>
+                        <div class="gait-seq-table">
+                            <div class="gait-seq-row header-row">
+                                <span>Gait</span><span>Duty%</span><span>Flight</span><span>CoT</span>
+                            </div>
+                            <div class="gait-seq-row">
+                                <span>Crawl</span><span>75%</span><span>No</span><span>High</span>
+                            </div>
+                            <div class="gait-seq-row">
+                                <span>Trot</span><span>60%</span><span>No</span><span>Med</span>
+                            </div>
+                            <div class="gait-seq-row">
+                                <span>Gallop</span><span>40%</span><span>Yes</span><span>Low</span>
+                            </div>
+                            <div class="gait-seq-row">
+                                <span>Bound</span><span>35%</span><span>Yes</span><span>Low</span>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-sub-header">Bézier Trajectory Notes</div>
+                        <p class="help-text" style="padding:8px 0;">
+                            Foot paths use cubic Bézier arcs. Control points P1/P2 are offset to create a natural parabolic arc with rapid heel-plant. This eliminates the foot-scrape artifact of linear interpolation while keeping servo motion smooth and bounded.
+                        </p>
+                    </div>
+
+                    <!-- Centre: Stride efficiency + energy chart -->
+                    <div class="card chart-card">
+                        <div class="card-header">Stride Efficiency &amp; Energy Over Time</div>
+                        <div class="chart-container analysis-chart">
+                            <canvas id="ga-stride-chart"></canvas>
+                        </div>
+
+                        <div class="divider"></div>
+                        <div class="card-header" style="border:none; padding-top:4px;">Phase Timing Diagram (Live)</div>
+                        <div class="phase-diagram-large">
+                            <canvas id="phase-canvas-large" width="500" height="120"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right: Foot trajectory top-view -->
+                    <div class="card">
+                        <div class="card-header">Foot Path Plotter (Top View XZ)</div>
+                        <div class="foot-path-wrap">
+                            <canvas id="foot-path-canvas" width="320" height="320"></canvas>
+                        </div>
+                        <div class="foot-path-legend">
+                            <div class="fp-legend-item" style="color:#e67e22">■ FR</div>
+                            <div class="fp-legend-item" style="color:#2ecc71">■ FL</div>
+                            <div class="fp-legend-item" style="color:#3de8ff">■ BR</div>
+                            <div class="fp-legend-item" style="color:#e74c3c">■ BL</div>
+                        </div>
+                        <p class="help-text" style="padding:8px 12px;">
+                            Oval traces = healthy elliptical gait. Flat/choppy = tuning needed.
+                            Larger ovals = higher stride. Asymmetry = yaw drift risk.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================================================
+                 TAB 5: KINEMATICS MATH
+                 ================================================ -->
+            <section id="tab-math" class="tab-content">
+                <div class="math-container">
+                    <div class="card">
+                        <div class="card-header">MAGI Leg Inverse Kinematics (IK) Algorithm &amp; Debugger</div>
+
+                        <div class="math-content">
+                            <div class="math-two-col">
+                                <div>
+                                    <h3>1. Leg Architecture (3-DOF)</h3>
+                                    <p>Each leg has three revolute joints:</p>
+                                    <ul>
+                                        <li><strong>Coxa (θ<sub>c</sub>):</strong> Hip horizontal rotation</li>
+                                        <li><strong>Femur (θ<sub>f</sub>):</strong> Hip vertical swing</li>
+                                        <li><strong>Tibia (θ<sub>t</sub>):</strong> Knee swing</li>
+                                    </ul>
+
+                                    <div class="math-sketch-container">
+                                        <div class="math-formula-box">
+                                            <h4>Link Specs:</h4>
+                                            <p>Coxa (<em>d<sub>c</sub></em>): <strong>30 mm</strong></p>
+                                            <p>Femur (<em>l<sub>1</sub></em>): <strong>90 mm</strong></p>
+                                            <p>Tibia (<em>l<sub>2</sub></em>): <strong>90 mm</strong></p>
+                                        </div>
+                                    </div>
+
+                                    <h3>2. Analytical IK Solver</h3>
+
+                                    <div class="formula-block">
+                                        <div class="formula-title">Coxa Angle (θ<sub>c</sub>)</div>
+                                        <p class="formula-math">θ<sub>c</sub> = atan2(y, x)</p>
+                                    </div>
+
+                                    <div class="formula-block">
+                                        <div class="formula-title">Effective Reach (L<sub>d</sub>)</div>
+                                        <p class="formula-math">r = √(x² + y²)</p>
+                                        <p class="formula-math">L<sub>d</sub> = √((r − d<sub>c</sub>)² + z²)</p>
+                                    </div>
+
+                                    <div class="formula-block">
+                                        <div class="formula-title">Tibia Angle (θ<sub>t</sub>) — Law of Cosines</div>
+                                        <p class="formula-math">θ<sub>t</sub> = π − arccos[(l₁² + l₂² − L<sub>d</sub>²) / (2·l₁·l₂)]</p>
+                                    </div>
+
+                                    <div class="formula-block">
+                                        <div class="formula-title">Femur Angle (θ<sub>f</sub>)</div>
+                                        <p class="formula-math">α = atan2(z, r − d<sub>c</sub>)</p>
+                                        <p class="formula-math">β = arccos[(l₁² + L<sub>d</sub>² − l₂²) / (2·l₁·L<sub>d</sub>)]</p>
+                                        <p class="formula-math">θ<sub>f</sub> = α + β</p>
+                                    </div>
+
+                                    <h3>3. Interactive IK Solver</h3>
+                                    <div class="math-playground">
+                                        <div class="playground-inputs">
+                                            <div class="control-group">
+                                                <div class="slider-header"><span>Target X (Forward)</span> <span id="math-val-x">0 mm</span></div>
+                                                <input type="range" id="math-x" min="-100" max="100" value="0" oninput="solveMathIK()">
+                                            </div>
+                                            <div class="control-group">
+                                                <div class="slider-header"><span>Target Y (Lateral)</span> <span id="math-val-y">50 mm</span></div>
+                                                <input type="range" id="math-y" min="20" max="120" value="50" oninput="solveMathIK()">
+                                            </div>
+                                            <div class="control-group">
+                                                <div class="slider-header"><span>Target Z (Height)</span> <span id="math-val-z">-150 mm</span></div>
+                                                <input type="range" id="math-z" min="-220" max="-90" value="-150" oninput="solveMathIK()">
+                                            </div>
+                                        </div>
+                                        <div class="playground-outputs">
+                                            <h4>Calculated Angles:</h4>
+                                            <div class="math-result-box">
+                                                <div class="math-res-item">Coxa (θ<sub>c</sub>): <strong id="math-res-coxa">0.0°</strong></div>
+                                                <div class="math-res-item">Femur (θ<sub>f</sub>): <strong id="math-res-femur">0.0°</strong></div>
+                                                <div class="math-res-item">Tibia (θ<sub>t</sub>): <strong id="math-res-tibia">0.0°</strong></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- IK diagram canvas -->
+                                <div class="ik-diagram-wrap">
+                                    <div class="card-sub-header" style="padding:0 0 8px 0;">Sagittal Plane Visualisation</div>
+                                    <canvas id="ik-diagram-canvas" width="300" height="280" class="ik-canvas"></canvas>
+                                    <p class="help-text" style="margin-top:8px;">
+                                        Cyan = Coxa · Orange = Femur · White = Tibia · Green dot = Foot
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Load modules in dependency order -->
+    <script src="robot.js"></script>
+    <script src="gait.js"></script>
+    <script src="rl_train.js"></script>
+    <script src="magi_fusion.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

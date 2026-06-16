@@ -1,0 +1,122 @@
+# =============================================================================
+# MAGI OS — Docker Test Configuration
+# docker/test_config.yaml
+#
+# Enables ALL sensors with simulated data.
+# All hardware stubs are activated via mock_hardware/ layer.
+# =============================================================================
+
+system:
+  name: "MAGI-DOCKER-TEST"
+  version: "1.0.0"
+  log_level: "DEBUG"
+  log_dir: "/opt/magi/logs"
+
+cpu:
+  core_os: 0
+  core_magi1: 0          # Docker: no CPU isolation — all on core 0
+  core_magi2: 0
+  core_magi3: 0
+
+ipc:
+  base_path: "ipc:///tmp/magi"
+  sensor_pub:      "ipc:///tmp/magi/sensor_pub.sock"
+  magi1_result:    "ipc:///tmp/magi/magi1_result.sock"
+  magi2_result:    "ipc:///tmp/magi/magi2_result.sock"
+  magi3_decision:  "ipc:///tmp/magi/magi3_decision.sock"
+  heartbeat:       "ipc:///tmp/magi/heartbeat.sock"
+  shm_camera:      "/magi_camera_frame"
+  shm_camera_size: 921600     # 640×480×3
+
+sensors:
+  poll_rate_hz: 10           # Slower in Docker for easier log reading
+
+  i2c:
+    bus: 1
+    devices:
+      - name: "imu"
+        address: 0x68
+        enabled: true         # ← Uses mock_smbus2 → sinusoidal fake data
+      - name: "barometer"
+        address: 0x76
+        enabled: false
+      - name: "tof_front"
+        address: 0x29
+        enabled: false
+
+  spi:
+    bus: 0
+    devices:
+      - name: "adc"
+        chip_select: 0
+        speed_hz: 1000000
+        enabled: false
+
+  uart:
+    - name: "gps"
+      port: "/dev/ttyAMA0"
+      baud: 9600
+      enabled: false
+
+  gpio:
+    - name: "trigger_in"
+      pin: 17
+      mode: "input"
+      pull: "up"
+      interrupt: "falling"
+      enabled: true           # ← Uses mock_pigpio → random events every 15–30s
+    - name: "status_led"
+      pin: 27
+      mode: "output"
+      enabled: true
+    - name: "alert_out"
+      pin: 22
+      mode: "output"
+      enabled: true
+
+models:
+  magi1:
+    name: "Melchior"
+    role: "detection"
+    path: "/opt/magi/models/melchior.tflite"   # ← Mock interpreter ignores path
+    input_size: [320, 320]
+    input_dtype: "float32"
+    confidence_threshold: 0.4
+    nms_threshold: 0.4
+    num_threads: 1
+    use_xnnpack: false        # No XNNPACK in Docker
+    inference_timeout_ms: 200
+
+  magi2:
+    name: "Balthasar"
+    role: "analysis"
+    path: "/opt/magi/models/balthasar.tflite"
+    input_size: [224, 224]
+    input_dtype: "float32"
+    num_threads: 1
+    use_xnnpack: false
+    inference_timeout_ms: 150
+
+  magi3:
+    name: "Caspar"
+    role: "fusion"
+    path: "/opt/magi/models/caspar.tflite"
+    input_size: [128]
+    input_dtype: "float32"
+    num_threads: 1
+    use_xnnpack: false
+    inference_timeout_ms: 50
+
+camera:
+  enabled: false             # Set true to enable mock camera frames
+  source: 0
+  width: 640
+  height: 480
+  fps: 10
+  format: "BGR"
+
+output:
+  uart_telemetry: false
+  gpio_alert: true
+  log_detections: true
+  log_file: "/opt/magi/logs/detections.log"

@@ -1,0 +1,33 @@
+# MAGI OS — Docker Requirements (testing environment)
+# Hardware stubs replace RPi-specific libs (pigpio, smbus2, spidev, RPi.GPIO, posix_ipc)
+
+# IPC
+pyzmq==26.0.3
+msgpack==1.0.8
+
+# Sensor stubs (real libs — mocked at import level)
+pyserial==3.5
+pyyaml==6.0.1
+
+# ML inference (x86_64 compatible)
+# tflite-runtime is MOCKED via mock_hardware/tflite_runtime/ — not installed here
+numpy==1.26.4
+
+# Vision
+opencv-python-headless==4.9.0.80
+
+# Shared memory — MOCKED via mock_hardware/posix_ipc.py, real package not needed
+# posix-ipc removed (v2.0.0 does not exist; mock layer handles all IPC)
+
+# Monitoring
+psutil==5.9.8
+
+# Testing
+pytest==8.2.0
+pytest-timeout==2.3.1
+
+# Telemetry storage and compression
+pandas
+pyarrow
+zarr
+zstandard

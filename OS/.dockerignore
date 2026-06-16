@@ -1,0 +1,24 @@
+# Docker ignore — exclude dev files from the build context
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.venv
+venv/
+
+# Windows-specific
+Thumbs.db
+desktop.ini
+
+# Setup scripts (not needed in container)
+setup/
+
+# Docs
+*.md
+*.pdf
+
+# OS files
+.DS_Store

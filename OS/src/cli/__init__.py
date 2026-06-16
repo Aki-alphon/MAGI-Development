@@ -1,0 +1,1 @@
+# MAGI CLI package
