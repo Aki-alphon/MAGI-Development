@@ -1,0 +1,81 @@
+# MAGI Vision Model Configuration
+# =================================
+# Melchior — Canopy-Level Plant Health Classifier
+
+model:
+  name: melchior_v2
+  backbone: mobilenetv2
+  pretrained: imagenet
+
+  input:
+    height: 224
+    width: 224
+    channels: 6
+    channel_names:
+      - R
+      - G
+      - B
+      - ExG
+      - GRVI
+      - L_star
+
+  output:
+    num_classes: 4
+    class_names:
+      - healthy
+      - mild_stress
+      - moderate_stress
+      - severe_stress
+    health_scores:
+      - 1.0
+      - 0.7
+      - 0.4
+      - 0.15
+
+  head:
+    dense_units: 256
+    dropout: 0.4
+    activation: softmax
+
+training:
+  phase1:
+    description: "Train classification head only"
+    freeze_backbone: true
+    epochs: 15
+    learning_rate: 0.001
+    optimizer: adam
+
+  phase2:
+    description: "Fine-tune top backbone layers"
+    unfreeze_from_layer: 100
+    epochs: 30
+    learning_rate: 0.00001
+    optimizer: adam
+
+  batch_size: 32
+  mixed_precision: true
+  loss: categorical_crossentropy
+
+  callbacks:
+    early_stopping:
+      monitor: val_accuracy
+      patience: 7
+      restore_best_weights: true
+    reduce_lr:
+      monitor: val_loss
+      factor: 0.5
+      patience: 3
+      min_lr: 0.0000001
+    model_checkpoint:
+      monitor: val_accuracy
+      save_best_only: true
+
+  class_weights: auto
+
+export:
+  tflite:
+    quantization: float16
+    xnnpack_delegate: true
+    num_threads: 4
+    max_latency_ms: 200
+    max_size_mb: 10

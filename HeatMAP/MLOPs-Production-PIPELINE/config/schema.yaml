@@ -1,0 +1,74 @@
+# MAGI Vision Dataset Schema
+# ============================
+
+dataset:
+  type: image_classification
+  source: directory  # 'directory' or 'kaggle'
+  kaggle_dataset: "vipoooool/new-plant-diseases-dataset"
+
+  classes:
+    - healthy
+    - mild_stress
+    - moderate_stress
+    - severe_stress
+
+  split:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+  validation:
+    supported_formats:
+      - jpg
+      - jpeg
+      - png
+      - bmp
+    min_image_size: [64, 64]
+    min_samples_per_class: 50
+    max_imbalance_ratio: 10.0
+
+preprocessing:
+  spectral_masking:
+    resize: [224, 224]
+    clahe:
+      color_space: LAB
+      clip_limit: 2.0
+      grid_size: [8, 8]
+    computed_channels:
+      ExG: "2*G - R - B"
+      GRVI: "(G - R) / (G + R + eps)"
+      L_star: "LAB_L_channel"
+    normalization:
+      rgb_method: imagenet
+      rgb_mean: [0.485, 0.456, 0.406]
+      rgb_std: [0.229, 0.224, 0.225]
+      computed_method: dataset_standardize
+
+  augmentation:
+    horizontal_flip: true
+    vertical_flip: false
+    rotation_range: 15
+    brightness_range: [0.7, 1.3]
+    contrast_range: [0.8, 1.2]
+    zoom_range: [0.85, 1.15]
+    channel_dropout_rate: 0.1
+    gaussian_noise_std: 0.02
+
+canopy_analysis:
+  grid:
+    rows: 3
+    cols: 4
+  vegetation_filter:
+    method: excess_green
+    threshold: 30
+    min_vegetation_fraction: 0.3
+  temporal_smoothing:
+    method: ema
+    alpha: 0.3
+  spatial_grid:
+    cell_size_m: 1.0
+    min_observations: 3
+  health_thresholds:
+    healthy: 0.8
+    mild_stress: 0.6
+    moderate_stress: 0.4

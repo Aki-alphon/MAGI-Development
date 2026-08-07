@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAGI Vision — Plant Health Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0e17;
+            color: #e0e6ed;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #0f1923 0%, #1a2332 100%);
+            border-bottom: 1px solid #1e3a5f;
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #4ecdc4, #44bd32);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .subtitle { color: #6b7c93; font-size: 14px; }
+        .main { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .card {
+            background: #111923;
+            border: 1px solid #1e3a5f;
+            border-radius: 12px;
+            padding: 24px;
+            transition: border-color 0.3s;
+        }
+        .card:hover { border-color: #4ecdc4; }
+        .card h2 { font-size: 18px; color: #4ecdc4; margin-bottom: 12px; }
+        .card p { color: #6b7c93; font-size: 14px; margin-bottom: 16px; }
+        .upload-zone {
+            border: 2px dashed #1e3a5f;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-zone:hover { border-color: #4ecdc4; background: rgba(78,205,196,0.05); }
+        .upload-zone.dragover { border-color: #44bd32; background: rgba(68,189,50,0.1); }
+        input[type="file"] { display: none; }
+        .btn {
+            background: linear-gradient(135deg, #4ecdc4, #44bd32);
+            color: #0a0e17;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: opacity 0.3s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-danger { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+        .result-panel {
+            margin-top: 16px;
+            padding: 16px;
+            background: #0d1520;
+            border-radius: 8px;
+            display: none;
+        }
+        .result-panel.visible { display: block; }
+        .health-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: #1e3a5f;
+            margin: 8px 0;
+            overflow: hidden;
+        }
+        .health-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        .score { font-size: 28px; font-weight: 700; margin: 8px 0; }
+        .score.healthy { color: #44bd32; }
+        .score.mild { color: #f1c40f; }
+        .score.moderate { color: #e67e22; }
+        .score.severe { color: #e74c3c; }
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .tag.healthy { background: rgba(68,189,50,0.2); color: #44bd32; }
+        .tag.mild_stress { background: rgba(241,196,15,0.2); color: #f1c40f; }
+        .tag.moderate_stress { background: rgba(230,126,34,0.2); color: #e67e22; }
+        .tag.severe_stress { background: rgba(231,76,60,0.2); color: #e74c3c; }
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            margin-top: 12px;
+        }
+        .tile {
+            aspect-ratio: 4/3;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .tile.soil { background: #2c1a0e; color: #8b6914; }
+        .tile.healthy { background: rgba(68,189,50,0.3); color: #44bd32; }
+        .tile.mild_stress { background: rgba(241,196,15,0.3); color: #f1c40f; }
+        .tile.moderate_stress { background: rgba(230,126,34,0.3); color: #e67e22; }
+        .tile.severe_stress { background: rgba(231,76,60,0.3); color: #e74c3c; }
+        .status { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .preview-img { max-width: 100%; border-radius: 8px; margin-top: 12px; }
+        .meta { font-size: 12px; color: #6b7c93; margin-top: 8px; }
+        .footer {
+            text-align: center; padding: 24px;
+            color: #3a4a5c; font-size: 12px; margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🌿 MAGI Vision — Melchior</h1>
+            <div class="subtitle">Canopy-Level Plant Health Monitoring System</div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="grid">
+            <!-- SINGLE IMAGE PREDICTION -->
+            <div class="card" id="single-card">
+                <h2>🖼️ Single Image Analysis</h2>
+                <p>Upload a plant image for health classification</p>
+                <div class="upload-zone" id="single-zone" onclick="document.getElementById('single-file').click()">
+                    <p>📷 Drop image here or click to upload</p>
+                    <input type="file" id="single-file" accept="image/*" onchange="predictSingle(this)">
+                </div>
+                <img id="single-preview" class="preview-img" style="display:none">
+                <div class="result-panel" id="single-result">
+                    <div class="score" id="single-score">—</div>
+                    <div id="single-class"></div>
+                    <div class="health-bar"><div class="health-bar-fill" id="single-bar"></div></div>
+                    <div class="meta" id="single-meta"></div>
+                </div>
+            </div>
+
+            <!-- CANOPY ANALYSIS -->
+            <div class="card" id="canopy-card">
+                <h2>🌾 Canopy Analysis (Grid-Tile)</h2>
+                <p>Upload a field frame for spatial health mapping</p>
+                <div class="upload-zone" id="canopy-zone" onclick="document.getElementById('canopy-file').click()">
+                    <p>📷 Drop field image here or click to upload</p>
+                    <input type="file" id="canopy-file" accept="image/*" onchange="predictCanopy(this)">
+                </div>
+                <img id="canopy-preview" class="preview-img" style="display:none">
+                <div class="result-panel" id="canopy-result">
+                    <div class="score" id="canopy-score">—</div>
+                    <div id="canopy-action"></div>
+                    <div class="tile-grid" id="canopy-grid"></div>
+                    <div class="meta" id="canopy-meta"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TRAIN / STATUS -->
+        <div class="card" style="margin-top: 24px;">
+            <h2>⚙️ Pipeline Control</h2>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn" onclick="triggerTraining()">🚀 Run Training Pipeline</button>
+                <button class="btn btn-danger" onclick="checkHealth()">📊 Check Status</button>
+                <div class="status" id="api-status">
+                    <div class="status-dot" style="background:#44bd32"></div>
+                    <span class="meta">API Online</span>
+                </div>
+            </div>
+            <div class="result-panel" id="status-panel"></div>
+        </div>
+    </div>
+
+    <div class="footer">
+        MAGI Vision System v2.0 — Melchior Canopy Health Scanner<br>
+        Spectral Masking: CLAHE + ExG + GRVI + L* | MobileNetV2 6ch | TFLite XNNPACK
+    </div>
+
+    <script>
+        async function predictSingle(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('single-preview').src = URL.createObjectURL(file);
+            document.getElementById('single-preview').style.display = 'block';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch('/predict', { method: 'POST', body: form });
+                const data = await res.json();
+
+                const panel = document.getElementById('single-result');
+                panel.classList.add('visible');
+
+                const score = data.health_score || 0;
+                const scoreEl = document.getElementById('single-score');
+                scoreEl.textContent = (score * 100).toFixed(1) + '%';
+                scoreEl.className = 'score ' + getScoreClass(score);
+
+                document.getElementById('single-class').innerHTML =
+                    `<span class="tag ${data.class}">${data.class}</span> — Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+
+                const bar = document.getElementById('single-bar');
+                bar.style.width = (score * 100) + '%';
+                bar.style.background = getScoreColor(score);
+
+                const probs = data.class_probabilities || {};
+                document.getElementById('single-meta').textContent =
+                    Object.entries(probs).map(([k,v]) => `${k}: ${(v*100).toFixed(1)}%`).join(' | ');
+            } catch (e) {
+                alert('Prediction failed: ' + e.message);
+            }
+        }
+
+        async function predictCanopy(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('canopy-preview').src = URL.createObjectURL(file);
+            document.getElementById('canopy-preview').style.display = 'block';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch('/predict/canopy', { method: 'POST', body: form });
+                const data = await res.json();
+
+                const panel = document.getElementById('canopy-result');
+                panel.classList.add('visible');
+
+                const score = data.mean_health || 0;
+                const scoreEl = document.getElementById('canopy-score');
+                scoreEl.textContent = 'Health: ' + (score * 100).toFixed(1) + '%';
+                scoreEl.className = 'score ' + getScoreClass(score);
+
+                document.getElementById('canopy-action').innerHTML =
+                    `Action: <span class="tag ${data.action === 'IDLE' ? 'healthy' : 'moderate_stress'}">${data.action}</span>` +
+                    ` | Coverage: ${(data.vegetation_coverage * 100).toFixed(0)}%`;
+
+                const grid = document.getElementById('canopy-grid');
+                grid.innerHTML = '';
+                (data.tiles || []).forEach(tile => {
+                    const el = document.createElement('div');
+                    const cls = tile.is_vegetation ? (tile.predicted_class || 'healthy') : 'soil';
+                    el.className = 'tile ' + cls;
+                    el.textContent = tile.is_vegetation ?
+                        (tile.health_score * 100).toFixed(0) + '%' : 'soil';
+                    grid.appendChild(el);
+                });
+
+                document.getElementById('canopy-meta').textContent =
+                    `Grid: ${data.grid_size} | Min health: ${(data.min_health * 100).toFixed(1)}%`;
+            } catch (e) {
+                alert('Canopy analysis failed: ' + e.message);
+            }
+        }
+
+        async function triggerTraining() {
+            if (!confirm('Start training pipeline? This may take a while.')) return;
+            const panel = document.getElementById('status-panel');
+            panel.classList.add('visible');
+            panel.innerHTML = '<p>⏳ Training pipeline running...</p>';
+
+            try {
+                const res = await fetch('/train', { method: 'POST' });
+                const data = await res.json();
+                panel.innerHTML = `<p>✅ ${data.message}</p>`;
+            } catch (e) {
+                panel.innerHTML = `<p>❌ Training failed: ${e.message}</p>`;
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                const res = await fetch('/health');
+                const data = await res.json();
+                const panel = document.getElementById('status-panel');
+                panel.classList.add('visible');
+                panel.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (e) {
+                alert('Health check failed');
+            }
+        }
+
+        function getScoreClass(score) {
+            if (score > 0.8) return 'healthy';
+            if (score > 0.6) return 'mild';
+            if (score > 0.4) return 'moderate';
+            return 'severe';
+        }
+        function getScoreColor(score) {
+            if (score > 0.8) return '#44bd32';
+            if (score > 0.6) return '#f1c40f';
+            if (score > 0.4) return '#e67e22';
+            return '#e74c3c';
+        }
+
+        // Drag & drop
+        ['single-zone', 'canopy-zone'].forEach(id => {
+            const zone = document.getElementById(id);
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const input = zone.querySelector('input[type="file"]');
+                input.files = e.dataTransfer.files;
+                input.dispatchEvent(new Event('change'));
+            });
+        });
+    </script>
+</body>
+</html>
