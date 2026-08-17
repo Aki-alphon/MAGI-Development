@@ -95,9 +95,11 @@ datasets/
 *.csv
 *.tfrecord
 
-# Excluded Folders
+# Excluded Folders / Large Files
 SKH HACKATHON/
 mathworks-Simscape-Robot-4Legs-26.1.2.7/
 Research paper/
 model &miscellenious/
+*.zip
+*.rar
 model &miscellenious
