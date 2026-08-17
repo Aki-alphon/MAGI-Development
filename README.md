@@ -47,27 +47,27 @@ The project was originally developed for **precision agriculture** — a walking
 MAGI is composed of three tightly coupled subsystems that communicate through well-defined interfaces:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              MAGI SYSTEM                                    │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                    MAGI OS  (Raspberry Pi 4B)                       │    │
-│  │                                                                     │    │
-│  │   Core 0: Sensor Hub ──────┐                                        │    │
-│  │   Core 0: Camera Capture ──┤── POSIX Shared Memory (Zero-Copy) ──┐  │    │
+┌─────────────────────────────────────────────────────────────────────────── ──┐
+│                              MAGI SYSTEM                                     │
+│                                                                              │
+│  ┌───────────────────────────────────────────────────────────────────── ┐    │
+│  │                    MAGI OS  (Raspberry Pi 4B)                        │    │
+│  │                                                                      │    │
+│  │   Core 0: Sensor Hub ──────┐                                         │    │
+│  │   Core 0: Camera Capture ──┤── POSIX Shared Memory (Zero-Copy) ── ┐  │    │
 │  │                            │                                      │  │    │
 │  │   Core 1: CELEBI ──────────┤── Object/Disease Detection (TFLite)  │  │    │
 │  │   Core 2: GENGAR ──────────┤── Scene Analysis + IMU Anomaly       │  │    │
 │  │   Core 3: LUGIA ───────────┘── Sensor Fusion + Decision Engine    │  │    │
 │  │                            │                                      │  │    │
-│  │        ZeroMQ XPUB/XSUB Message Bus (8 MB RAM)                   │  │    │
+│  │        ZeroMQ XPUB/XSUB Message Bus (8 MB RAM)                    │  │    │
 │  │        Parameter Server · Diagnostics · TF Frames · Recorder      │  │    │
 │  └────────────────────────────┬──────────────────────────────────────┘  │    │
 │                               │ UART (115200 baud)                      │    │
 │  ┌────────────────────────────▼──────────────────────────────────────┐  │    │
-│  │                    ESP32 Firmware                                  │  │    │
+│  │                    ESP32 Firmware                                 │  │    │
 │  │                                                                   │  │    │
-│  │   3-DOF Inverse Kinematics Solver ──► PCA9685 ──► 12× MG996R     │  │    │
+│  │   3-DOF Inverse Kinematics Solver ──► PCA9685 ──► 12× MG996R      │  │    │
 │  │   Gait Engine (Crawl / Trot / Bound) ──► Cubic Bézier Trajectories│  │    │
 │  │   MPU-6050 IMU ──► Complementary Filter                           │  │    │
 │  └───────────────────────────────────────────────────────────────────┘  │    │
@@ -75,11 +75,11 @@ MAGI is composed of three tightly coupled subsystems that communicate through we
 │  ┌───────────────────────────────────────────────────────────────────┐  │    │
 │  │              Browser Simulation & Training                        │  │    │
 │  │                                                                   │  │    │
-│  │   Three.js WebGL 3D Visualizer ──► Real-time IK + Gait Playback  │  │    │
+│  │   Three.js WebGL 3D Visualizer ──► Real-time IK + Gait Playback   │  │    │
 │  │   Genetic Algorithm Trainer ──► Evolve Gait Params / NN Weights   │  │    │
 │  │   PyBullet Physics ──► URDF Rigid-Body Validation                 │  │    │
 │  └───────────────────────────────────────────────────────────────────┘  │    │
-└─────────────────────────────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────────────────────────── ┘
 ```
 
 ### How the Three Subsystems Connect
@@ -100,7 +100,7 @@ MAGI is composed of three tightly coupled subsystems that communicate through we
                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │                        MAGI OS                                   │
-│                   (Raspberry Pi 4B)                               │
+│                   (Raspberry Pi 4B)                              │
 │                                                                  │
 │  Camera ──► Shared Memory ──► Celebi (Detection)                 │
 │                            ──► Gengar (Scene)                    │
@@ -436,8 +436,8 @@ MAGI uses a **Genetic Algorithm (GA)** to evolve optimal gait parameters. Traini
 ┌──────────────────────────────────────────────────────────────────┐
 │  1. Create population of N agents with random genes/weights      │
 │  2. Evaluate each agent for 5 simulated seconds                  │
-│  3. Score with multi-objective fitness function                   │
-│  4. Select top 20% (elitism) → crossover → mutate               │
+│  3. Score with multi-objective fitness function                  │
+│  4. Select top 20% (elitism) → crossover → mutate                │
 │  5. Repeat from step 2 until convergence                         │
 │  6. Export best genome as JSON → deploy to robot                 │
 └──────────────────────────────────────────────────────────────────┘
@@ -539,19 +539,19 @@ Here's how data flows through the complete system during operation:
                     ▼              ▼
               ┌─────────────────────┐
               │    lugia.py         │
-              │     (Core 3)       │
-              │                    │
-              │  + /sensors data   │
-              │  + ToF distance    │
-              │  + GPIO triggers   │
-              │                    │
-              │  Priority Rules    │
-              │  ──────────────    │
-              │  EMERGENCY (P10)   │
-              │  ALERT     (P6)    │
-              │  TRACK     (P4)    │
-              │  IDLE      (P0)    │
-              └────────┬───────────┘
+              │     (Core 3)        │
+              │                     │
+              │  + /sensors data    │
+              │  + ToF distance     │
+              │  + GPIO triggers    │
+              │                     │
+              │  Priority Rules     │
+              │  ──────────────     │
+              │  EMERGENCY (P10)    │
+              │  ALERT     (P6)     │
+              │  TRACK     (P4)     │
+              │  IDLE      (P0)     │
+              └────────┬─────────── ┘
                        │
                    /decision
                        │
@@ -614,7 +614,7 @@ The simulation doesn't just visualize — it produces **deployable artifacts**:
                    6.0V / 20A              Regulator
                           │                     │
                           ▼                     ▼
-                   ┌─────────────┐    ┌──────────────────┐
+                   ┌─────────────┐    ┌────────────────── ┐
                    │  PCA9685    │    │  Raspberry Pi 4B  │
                    │  (12 Servo  │    │  4GB LPDDR4       │
                    │   Channels) │    │                   │
