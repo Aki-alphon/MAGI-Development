@@ -1,1 +1,1 @@
-# MAGI-3 Caspar package
+# MAGI-3 Lugia package

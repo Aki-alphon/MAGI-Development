@@ -1,6 +1,6 @@
-/* MAGI Caspar Decision Fusion & Rule Engine - magi_fusion.js */
+/* MAGI Lugia Decision Fusion & Rule Engine - magi_fusion.js */
 
-class CasparDecisionEngine {
+class LugiaDecisionEngine {
     constructor(gaitController) {
         this.gaitController = gaitController;
         
@@ -180,13 +180,13 @@ class CasparDecisionEngine {
         // Update input nodes summaries
         document.getElementById('pipe-sensors-body').innerHTML = `ToF: ${this.tof} mm<br>GPIO Trg: ${this.gpioTrigger}`;
         
-        let melchiorText = "No targets (0.0s)";
+        let celebiText = "No targets (0.0s)";
         if (this.detections.length > 0) {
-            melchiorText = this.detections.map(d => `${d.label} (${(d.confidence*100).toFixed(0)}%)`).join("<br>");
+            celebiText = this.detections.map(d => `${d.label} (${(d.confidence*100).toFixed(0)}%)`).join("<br>");
         }
-        document.getElementById('pipe-melchior-body').innerHTML = melchiorText;
+        document.getElementById('pipe-celebi-body').innerHTML = celebiText;
         
-        document.getElementById('pipe-balthasar-body').innerHTML = `Scene: ${this.scene}<br>Anomaly: ${this.anomalyScore.toFixed(2)}`;
+        document.getElementById('pipe-gengar-body').innerHTML = `Scene: ${this.scene}<br>Anomaly: ${this.anomalyScore.toFixed(2)}`;
 
         // Update output nodes text
         let badge = document.getElementById('val-decision-badge');
@@ -195,7 +195,7 @@ class CasparDecisionEngine {
         
         document.getElementById('val-decision-reason').innerText = this.reason;
 
-        // Highlight active rules in Caspar card
+        // Highlight active rules in Lugia card
         const rules = ["rule-1", "rule-2", "rule-3", "rule-4", "rule-5", "rule-default"];
         rules.forEach(r => {
             let el = document.getElementById(r);

@@ -1,1 +1,1 @@
-# MAGI-1 Melchior package
+# MAGI-1 Celebi package

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MAGI: Quadruped Locomotion & Decision Simulator</title>
-    <meta name="description" content="MAGI OS — real-time 12-DOF quadruped walking simulation with Bézier gait trajectories, reinforcement learning training, neural network policy, and MAGI-3 Caspar decision fusion.">
+    <meta name="description" content="MAGI OS — real-time 12-DOF quadruped walking simulation with Bézier gait trajectories, reinforcement learning training, neural network policy, and MAGI-3 Lugia decision fusion.">
     <link rel="stylesheet" href="style.css">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,14 +28,14 @@
             <span class="logo-sub">SYSTEM CONTROL — LOCOMOTION OS v3.0</span>
         </div>
         <div class="system-status">
-            <div class="status-node" id="node-melchior">
-                <span class="node-dot ok"></span> MELCHIOR <span class="node-state">10 Hz</span>
+            <div class="status-node" id="node-celebi">
+                <span class="node-dot ok"></span> CELEBI <span class="node-state">10 Hz</span>
             </div>
-            <div class="status-node" id="node-balthasar">
-                <span class="node-dot ok"></span> BALTHASAR <span class="node-state">15 Hz</span>
+            <div class="status-node" id="node-gengar">
+                <span class="node-dot ok"></span> GENGAR <span class="node-state">15 Hz</span>
             </div>
-            <div class="status-node" id="node-caspar">
-                <span class="node-dot ok"></span> CASPAR <span class="node-state">50 Hz</span>
+            <div class="status-node" id="node-lugia">
+                <span class="node-dot ok"></span> LUGIA <span class="node-state">50 Hz</span>
             </div>
         </div>
     </header>
@@ -418,7 +418,7 @@
                     <!-- Scenario Injector -->
                     <div class="card control-card">
                         <div class="card-header">Inject Environmental Scenarios</div>
-                        <p class="help-text">Simulate sensor signals and observe how Caspar (MAGI-3) overrides physical gait.</p>
+                        <p class="help-text">Simulate sensor signals and observe how Lugia (MAGI-3) overrides physical gait.</p>
 
                         <div class="scenario-buttons">
                             <button class="scenario-btn active" id="scen-clear" onclick="setScenario('clear')">
@@ -439,7 +439,7 @@
                                 <span class="scen-icon">👤</span>
                                 <div class="scen-text">
                                     <strong>Intruder in Zone</strong>
-                                    <span>Balthasar: Restricted · Melchior: Person</span>
+                                    <span>Gengar: Restricted · Celebi: Person</span>
                                 </div>
                             </button>
                             <button class="scenario-btn" id="scen-anomaly" onclick="setScenario('anomaly')">
@@ -453,7 +453,7 @@
                                 <span class="scen-icon">🎯</span>
                                 <div class="scen-text">
                                     <strong>Weed Target Identified</strong>
-                                    <span>Melchior: Weed 89% — TRACK</span>
+                                    <span>Celebi: Weed 89% — TRACK</span>
                                 </div>
                             </button>
                         </div>
@@ -489,21 +489,21 @@
                                     <div class="pipe-node-title">Sensor Hub</div>
                                     <div class="pipe-node-body" id="pipe-sensors-body">ToF: 600mm<br>GPIO Trg: False</div>
                                 </div>
-                                <div class="pipe-node" id="pipe-melchior">
-                                    <div class="pipe-node-title">Melchior (MAGI-1)</div>
-                                    <div class="pipe-node-body" id="pipe-melchior-body">No targets (0.0s)</div>
+                                <div class="pipe-node" id="pipe-celebi">
+                                    <div class="pipe-node-title">Celebi (MAGI-1)</div>
+                                    <div class="pipe-node-body" id="pipe-celebi-body">No targets (0.0s)</div>
                                 </div>
-                                <div class="pipe-node" id="pipe-balthasar">
-                                    <div class="pipe-node-title">Balthasar (MAGI-2)</div>
-                                    <div class="pipe-node-body" id="pipe-balthasar-body">Scene: normal<br>Anomaly: 0.12</div>
+                                <div class="pipe-node" id="pipe-gengar">
+                                    <div class="pipe-node-title">Gengar (MAGI-2)</div>
+                                    <div class="pipe-node-body" id="pipe-gengar-body">Scene: normal<br>Anomaly: 0.12</div>
                                 </div>
                             </div>
 
                             <div class="node-arrow">🠖</div>
 
                             <div class="node-column center-column">
-                                <div class="pipe-node fusion-active" id="pipe-caspar">
-                                    <div class="pipe-node-title">Caspar (MAGI-3)</div>
+                                <div class="pipe-node fusion-active" id="pipe-lugia">
+                                    <div class="pipe-node-title">Lugia (MAGI-3)</div>
                                     <div class="pipe-node-body">
                                         <strong>Priority Logic Evaluator</strong>
                                         <div class="rule-list">
@@ -534,11 +534,11 @@
                         </div>
                     </div>
 
-                    <!-- Caspar console log -->
+                    <!-- Lugia console log -->
                     <div class="card log-card">
-                        <div class="card-header">Caspar (MAGI-3) Terminal Console</div>
-                        <div class="terminal-log" id="caspar-console">
-                            <span class="log-line">[SYSTEM] Caspar Node configured. CPU affinity pinned to Core 3.</span>
+                        <div class="card-header">Lugia (MAGI-3) Terminal Console</div>
+                        <div class="terminal-log" id="lugia-console">
+                            <span class="log-line">[SYSTEM] Lugia Node configured. CPU affinity pinned to Core 3.</span>
                             <span class="log-line">[SYSTEM] Subscribed: /sensors · /detections · /scene</span>
                             <span class="log-line">[DECISION] Decision loop active. State: IDLE</span>
                         </div>

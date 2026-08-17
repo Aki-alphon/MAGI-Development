@@ -52,18 +52,18 @@ SERVICES = [
         "delay":   3,
     },
     {
-        "name":    "magi1_melchior",
-        "cmd":     [VENV_PYTHON, f"{SRC}/magi1/melchior.py"],
+        "name":    "magi1_celebi",
+        "cmd":     [VENV_PYTHON, f"{SRC}/magi1/celebi.py"],
         "delay":   4,
     },
     {
-        "name":    "magi2_balthasar",
-        "cmd":     [VENV_PYTHON, f"{SRC}/magi2/balthasar.py"],
+        "name":    "magi2_gengar",
+        "cmd":     [VENV_PYTHON, f"{SRC}/magi2/gengar.py"],
         "delay":   4,
     },
     {
-        "name":    "magi3_caspar",
-        "cmd":     [VENV_PYTHON, f"{SRC}/magi3/caspar.py"],
+        "name":    "magi3_lugia",
+        "cmd":     [VENV_PYTHON, f"{SRC}/magi3/lugia.py"],
         "delay":   6,     # Start last — depends on magi1+magi2
     },
     {
@@ -147,9 +147,9 @@ class ManagedProcess:
 
         # Map service name to ZMQ node_id
         node_map = {
-            "magi1_melchior": "magi1",
-            "magi2_balthasar": "magi2",
-            "magi3_caspar": "magi3",
+            "magi1_celebi": "magi1",
+            "magi2_gengar": "magi2",
+            "magi3_lugia": "magi3",
             "sensor_hub": "sensor_hub",
             "camera": "camera",
             "batch_manager": "batch_manager",
@@ -187,7 +187,7 @@ class ManagedProcess:
 
     def flush_shared_memory(self):
         """Cleanly unlink shared memory to prevent corruption or locking on restart."""
-        if self.name in ["camera", "magi1_melchior", "magi2_balthasar"]:
+        if self.name in ["camera", "magi1_celebi", "magi2_gengar"]:
             try:
                 import posix_ipc
                 posix_ipc.unlink_shared_memory("/magi_camera_frame")

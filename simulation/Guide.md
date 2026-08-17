@@ -22,7 +22,7 @@ The sidebar has **5 tabs**:
 |-----|------|---------|
 | **Locomotion Sim** | 🤖 | Live 3D robot walking simulation |
 | **RL Gait Training** | 🧠 | Genetic algorithm + neural network training |
-| **Decision Fusion** | ⚡ | MAGI-3 Caspar sensor decision engine |
+| **Decision Fusion** | ⚡ | MAGI-3 Lugia sensor decision engine |
 | **Gait Analysis** | 📊 | Metrics, foot path, phase diagrams |
 | **Kinematics Math** | 📐 | IK equations + interactive solver |
 
@@ -155,7 +155,7 @@ Watch the **LVL badge** in the Training Controls header flash orange when diffic
 
 ---
 
-## ⚡ Tab 3 — Decision Fusion (Caspar / MAGI-3)
+## ⚡ Tab 3 — Decision Fusion (Lugia / MAGI-3)
 
 Simulates the **high-level decision engine** that overrides walking gait based on sensor inputs.
 
@@ -174,7 +174,7 @@ Simulates the **high-level decision engine** that overrides walking gait based o
 - **Front ToF Distance**: Drag slider to set the time-of-flight sensor distance. Below 200mm = emergency.
 - **Scene Anomaly Score**: 0.0 = normal, 1.0 = extreme. Above 0.70 = cautious crawl.
 
-### Priority Rule Engine (Caspar Logic)
+### Priority Rule Engine (Lugia Logic)
 
 ```
 Priority 10: ToF < 200mm          → EMERGENCY (halt + body drop)
@@ -186,11 +186,11 @@ Priority 4:  Detections present    → TRACK (lean forward)
 Default 0:   No events             → IDLE / forward walk
 ```
 
-The active rule **highlights in green** (or red for emergencies) in the Caspar node card.
+The active rule **highlights in green** (or red for emergencies) in the Lugia node card.
 
 ### Locomotion Loopback
 
-When Caspar fires a decision, it **overrides the gait controller**:
+When Lugia fires a decision, it **overrides the gait controller**:
 
 | Decision | Gait effect |
 |---------|------------|
@@ -199,7 +199,7 @@ When Caspar fires a decision, it **overrides the gait controller**:
 | TRACK | CRAWL at normal speed, pitch +8° (lean camera forward) |
 | IDLE | Restore slider values, normal walking |
 
-The **Caspar Terminal Console** logs every state change with timestamp.
+The **Lugia Terminal Console** logs every state change with timestamp.
 
 ---
 
@@ -400,7 +400,7 @@ simulation/
 ├── robot.js            ← Three.js 3D visualiser + IK solver
 ├── gait.js             ← Bézier gait engine (Crawl/Trot/Gallop/Bound)
 ├── rl_train.js         ← Genetic algorithm + NNPolicy trainer
-├── magi_fusion.js      ← Caspar decision engine (priority rules)
+├── magi_fusion.js      ← Lugia decision engine (priority rules)
 ├── dashboard.js        ← Main coordinator + all tab event handlers
 ├── SpiderQ.urdf        ← Physical robot URDF definition
 ├── SpiderQ.glb         ← 3D robot mesh (GLB format)
@@ -432,11 +432,11 @@ Browser
 │     ├── nextGeneration() → selection + crossover + mutation      │
 │     └── drawGenes() / drawPhaseDiagram()                         │
 │                                                                   │
-└── magi_fusion.js──── CasparDecisionEngine                        │
+└── magi_fusion.js──── LugiaDecisionEngine                        │
       ├── evaluateRules() → priority-ordered rule chain            │
       └── applyLocomotionLoopback() → overrides GaitGenerator ─────┘
 ```
 
 ---
 
-*MAGI OS v3.0 — MELCHIOR · BALTHASAR · CASPAR*
+*MAGI OS v3.0 — CELEBI · GENGAR · LUGIA*

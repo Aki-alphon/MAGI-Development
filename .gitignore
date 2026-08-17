@@ -1,45 +1,103 @@
-# Compiled Python files
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.ipynb_checkpoints/
+*.py[cod]
+*$py.class
 
-# PlatformIO & IDEs
-.pio/
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and Editor files
+.idea/
 .vscode/
-*.o
-*.elf
-*.hex
-*.bin
-*.su
-
-# OS files
+*.swp
+*.swo
 .DS_Store
-Thumbs.db
+*.sublime-project
+*.sublime-workspace
 
-# Large media files
-*.mp4
-*.avi
-*.mov
+# MAGI Project Specifics
+# Logs
+logs/
+*.log
 
-# Archive files
-*.zip
-*.rar
-*.tar.gz
-*.7z
+# ML Pipeline Artifacts (large temporary files)
+artifact/
+HeatMAP/MLOPs-Production-PIPELINE/artifact/
+HeatMAP/MLOPs-Production-PIPELINE/logs/
+HeatMAP/MLOPs-Production-PIPELINE/mlruns/
 
-# Mathworks Simscape simulation project (External)
+# Large Model Files
+# Ignoring HDF5 and Keras files since they are very large (>50MB).
+# Keeping .tflite files since they are small enough for edge deployment and GitHub (<10MB).
+*.h5
+*.keras
+
+# Data
+data/
+datasets/
+*.csv
+*.tfrecord
+
+# Excluded Folders
+SKH HACKATHON/
 mathworks-Simscape-Robot-4Legs-26.1.2.7/
-mathworks-Simscape-Robot-4Legs-26.1.2.7.zip
-
-# HeatMAP temporary/converted files
-HeatMAP/vertopal.com_Heatmap_algo.doc
-
-# Firmware test project
-firmware/pca9685_test/
-
-# Exclude all files in 'model &miscellenious' EXCEPT for 'MAGI.3mf/' and 'README.md'
-model &miscellenious/*
-!model &miscellenious/MAGI.3mf/
-!model &miscellenious/README.md
+Research paper/
+model &miscellenious/
+model &miscellenious

@@ -4,7 +4,7 @@ src/locomotion/locomotion_node.py
 
 A LifecycleNode that:
   1. Loads the RL-trained gait config (gait_config.yaml).
-  2. Subscribes to /decision (Caspar) and /sensors (SensorHub).
+  2. Subscribes to /decision (Lugia) and /sensors (SensorHub).
   3. Selects gait mode and body posture based on the active decision.
   4. Drives 12 MG996R servos at 50Hz via PCA9685 over I2C.
   5. Publishes /locomotion_state diagnostic telemetry.
@@ -80,7 +80,7 @@ class PCA9685Driver:
 
 class LocomotionNode(LifecycleNode):
 
-    # Map Caspar action strings → gait type + speed
+    # Map Lugia action strings → gait type + speed
     ACTION_MAP = {
         "IDLE":      {"gait": "stand",  "freq": 0.0, "stride_scale": 1.0},
         "TRACK":     {"gait": "crawl",  "freq": 1.0, "stride_scale": 0.8},

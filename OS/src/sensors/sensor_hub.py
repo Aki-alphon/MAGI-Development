@@ -203,11 +203,21 @@ class UARTSensor:
 
 # ─── Sensor Hub Main ─────────────────────────────────────────────────────────
 
+# Broker frontend socket (same path used by LifecycleNode.create_publisher)
+_BUS_PUB = "ipc:///tmp/magi/bus_pub.sock"
+
+
 class SensorHub:
     def __init__(self):
-        self.pub = Publisher(IPC_CFG["sensor_pub"])
+        # Connect to the broker (not bind our own socket) so all LifecycleNodes
+        # receive /sensors through the standard XPUB/XSUB message bus.
+        import zmq, msgpack as _mp
+        self._ctx  = zmq.Context.instance()
+        self._sock = self._ctx.socket(zmq.PUB)
+        self._sock.connect(_BUS_PUB)
+        time.sleep(0.2)   # Slow-joiner guard
         self._init_sensors()
-        log.info("SensorHub ready — publishing to " + IPC_CFG["sensor_pub"])
+        log.info(f"SensorHub ready — publishing /sensors through broker {_BUS_PUB}")
 
     def _init_sensors(self):
         """Initialize all enabled sensors from config."""
@@ -270,6 +280,7 @@ class SensorHub:
         return packet
 
     def run(self):
+        import msgpack as _mp
         log.info(f"Sensor hub running @ {POLL_RATE} Hz")
         seq = 0
         while _running:
@@ -279,7 +290,10 @@ class SensorHub:
             packet["seq"] = seq
             seq += 1
 
-            self.pub.publish("sensors", packet)
+            # Publish through broker with /sensors topic (matching LifecycleNode format)
+            topic_b   = b"/sensors"
+            payload_b = _mp.packb({"__type__": "sensor/bundle/v1", **packet}, use_bin_type=True)
+            self._sock.send_multipart([topic_b, payload_b])
 
             elapsed = time.monotonic() - t0
             sleep_t = POLL_DT - elapsed
@@ -291,7 +305,7 @@ class SensorHub:
         # Cleanup
         if self.gpio:
             self.gpio.cleanup()
-        self.pub.close()
+        self._sock.close()
         log.info("Sensor hub stopped.")
 
 

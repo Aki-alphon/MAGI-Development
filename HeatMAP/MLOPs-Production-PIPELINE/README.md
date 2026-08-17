@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**Multispectral Autonomous Ground Intelligence — Melchior Vision Subsystem**
+**Multispectral Autonomous Ground Intelligence — Celebi Vision Subsystem**
 
 *Continuous canopy scanning from a walking quadruped robot,  
 producing spatial health heatmaps for precision agriculture.*
@@ -59,7 +59,7 @@ MAGI Vision is a production MLOps training pipeline that produces TFLite models 
 │  │ TFLite + cfg │    │ Latency/size │    │ 6ch, 2-phase │       │
 │  └──────────────┘    └──────────────┘    └──────────────┘       │
 │                                                                  │
-│  Output: melchior.tflite + class_mapping.json +                  │
+│  Output: celebi.tflite + class_mapping.json +                  │
 │          preprocessing_config.json + deployment_manifest.json    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -88,7 +88,7 @@ Temporal EMA Smoothing
 Spatial Health Grid (1m × 1m cells)
     │
     ▼
-Caspar Decision Engine
+Lugia Decision Engine
     IDLE (healthy) / TRACK (slow) / ALERT (flag) / ANALYZE (stop)
 ```
 
@@ -322,14 +322,14 @@ This pipeline produces models for deployment on the MAGI quadruped robot:
 
 | MAGI Core | Process | Feeds |
 |---|---|---|
-| **Core 0** | Caspar (decision engine) | Receives health scores via ZeroMQ |
-| **Core 1** | Melchior (this system) | Continuous canopy health scanning |
-| **Core 2** | Balthasar (scene/navigation) | Obstacle detection & path planning |
+| **Core 0** | Lugia (decision engine) | Receives health scores via ZeroMQ |
+| **Core 1** | Celebi (this system) | Continuous canopy health scanning |
+| **Core 2** | Gengar (scene/navigation) | Obstacle detection & path planning |
 | **Core 3** | Gait controller | Motor control via ESP32 |
 
-The Melchior health scores drive Caspar's behavior:
+The Celebi health scores drive Lugia's behavior:
 
-| Health Score | Caspar Action | Robot Behavior |
+| Health Score | Lugia Action | Robot Behavior |
 |---|---|---|
 | `> 0.8` | IDLE | Normal walk speed (0.3 m/s) |
 | `0.5 – 0.8` | TRACK | Slow down (0.15 m/s), increase scan rate |
@@ -344,7 +344,7 @@ After training, the pipeline produces:
 
 ```
 tflite_export/
-├── melchior.tflite                 # TFLite model (float16, ~6.5MB)
+├── celebi.tflite                 # TFLite model (float16, ~6.5MB)
 ├── class_mapping.json              # {0: "healthy", 1: "mild_stress", ...}
 ├── preprocessing_config.json       # CLAHE params, normalization stats
 ├── normalization_stats.json        # ExG/GRVI/L* channel statistics

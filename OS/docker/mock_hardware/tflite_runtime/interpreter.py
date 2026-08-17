@@ -22,20 +22,18 @@ class Interpreter:
 
     # Map model name keywords → output spec
     _OUTPUT_SPECS = {
-        "melchior": {
-            # Detection model: boxes, classes, scores, count
+        "celebi": {
+            # Plant health classifier: 4 classes
+            # [healthy, mild_stress, moderate_stress, severe_stress]
             "outputs": [
-                np.zeros((1, 10, 4),  dtype=np.float32),   # boxes
-                np.zeros((1, 10),     dtype=np.float32),   # classes
-                np.random.rand(1, 10).astype(np.float32),  # scores
-                np.array([[3.0]],     dtype=np.float32),   # count
+                np.array([[0.7, 0.2, 0.08, 0.02]], dtype=np.float32),  # softmax probs
             ]
         },
-        "balthasar": {
+        "gengar": {
             # Classification: 10 scene classes
             "outputs": [np.random.dirichlet(np.ones(10)).reshape(1, 10).astype(np.float32)]
         },
-        "caspar": {
+        "lugia": {
             # Fusion: 5 action logits
             "outputs": [np.random.rand(1, 5).astype(np.float32)]
         },
@@ -44,7 +42,7 @@ class Interpreter:
     def __init__(self, model_path: str = "", experimental_delegates=None, num_threads: int = 1):
         self._model_path = model_path
         self._tensors    = {}
-        self._key        = "caspar"  # default
+        self._key        = "lugia"  # default
 
         for k in self._OUTPUT_SPECS:
             if k in model_path.lower():
@@ -57,6 +55,9 @@ class Interpreter:
         pass
 
     def get_input_details(self) -> list:
+        # Celebi expects (1, 224, 224, 6) — 6-channel spectral tensor
+        if self._key == "celebi":
+            return [{"index": 0, "shape": [1, 224, 224, 6], "dtype": np.float32}]
         return [{"index": 0, "shape": [1, 224, 224, 3], "dtype": np.float32}]
 
     def get_output_details(self) -> list:
@@ -72,12 +73,12 @@ class Interpreter:
         time.sleep(random.uniform(0.010, 0.050))   # 10–50 ms mock inference
         # Refresh random output each invoke
         spec = self._OUTPUT_SPECS.get(self._key, {"outputs": [np.zeros((1, 5), dtype=np.float32)]})
-        if self._key == "melchior":
-            scores = np.random.rand(1, 10).astype(np.float32)
-            scores[0, :3] = np.random.uniform(0.4, 0.95, 3)  # 3 confident detections
-            spec["outputs"][2] = scores
-            spec["outputs"][1] = np.array([[0, 14, 2]], dtype=np.float32).reshape(1, 10)  # person, cat, car
-        elif self._key == "balthasar":
+        if self._key == "celebi":
+            # Simulate a realistic plant health distribution:
+            # mostly healthy, occasional mild/moderate stress patches
+            probs = np.random.dirichlet(np.array([6.0, 2.5, 1.0, 0.5]))
+            spec["outputs"][0] = probs.reshape(1, 4).astype(np.float32)
+        elif self._key == "gengar":
             spec["outputs"][0] = np.random.dirichlet(np.ones(10)).reshape(1, 10).astype(np.float32)
 
     def get_tensor(self, index: int) -> np.ndarray:

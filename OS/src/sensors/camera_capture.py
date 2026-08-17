@@ -3,7 +3,7 @@ MAGI OS — Camera Capture Process
 /opt/magi/src/sensors/camera_capture.py
 
 Captures frames from USB/Pi camera and writes them to POSIX
-shared memory for zero-copy access by MAGI-1 (Melchior).
+shared memory for zero-copy access by MAGI-1 (Celebi).
 Runs on Core 0 alongside sensor_hub.
 """
 

@@ -1,6 +1,9 @@
 import os
 import sys
+import gc
+import math
 import json
+import glob
 import numpy as np
 import cv2
 
@@ -23,18 +26,24 @@ from magi_vision.utils.main_utils import (
     write_json_file,
     ensure_directory,
 )
+from magi_vision.constants import STEPS_PER_EXECUTION
 
 
 class ModelTrainer:
     """
     Stage 4: Model Trainer
     ----------------------
-    Builds and trains a modified MobileNetV2 with 6-channel input
+    Builds and trains a modified MobileNetV2 with 8-channel input
     for canopy-level plant health classification.
 
     Two-phase training:
-      Phase 1: Frozen backbone, train classification head (15 epochs)
-      Phase 2: Unfreeze top layers, fine-tune (30 epochs)
+      Phase 1: Frozen backbone, train classification head only
+               Callbacks: EarlyStopping + ModelCheckpoint + ReduceLROnPlateau
+      Phase 2: Unfreeze top layers, cosine-decay fine-tune
+               Callbacks: EarlyStopping + ModelCheckpoint + LearningRateScheduler(cosine)
+
+    Each phase uses a single model.fit() call — the model stays in GPU memory
+    the entire time. No per-epoch save/load/clear_session overhead.
 
     Exports both Keras (.keras) and TFLite (.tflite) models.
     """
@@ -49,22 +58,29 @@ class ModelTrainer:
         self.transformation_artifact = data_transformation_artifact
         self.config = model_trainer_config
 
-    def _build_model(self) -> keras.Model:
+    # ─────────────────────────────────────────────────────────────────────────
+    # Model Construction
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _build_model(self) -> tuple:
         """
-        Build modified MobileNetV2 with 6-channel input.
+        Build modified MobileNetV2 with 8-channel input.
 
         Architecture:
-          Input (224, 224, 6) → Channel Adapter Conv2D (6→3) → 
-          MobileNetV2 backbone → GAP → Dense(256) → Dropout(0.4) → 
+          Input (224, 224, 8) → Channel Adapter Conv2D (8→3) →
+          MobileNetV2 backbone → GAP → Dense(256) → Dropout(0.4) →
           Dense(NUM_CLASSES, softmax)
+
+        Returns:
+            (model, base_model) tuple — base_model reference needed for Phase 2 unfreezing.
         """
-        logging.info("Building 6-channel MobileNetV2 model...")
+        logging.info("Building 8-channel MobileNetV2 model...")
 
         input_shape = (*self.config.image_size, self.config.input_channels)
         inputs = keras.Input(shape=input_shape, name="spectral_input")
 
-        # Channel adapter: 6ch → 3ch for MobileNetV2 compatibility
-        # Uses a 1×1 convolution to learn the optimal channel combination
+        # Channel adapter: 8ch → 3ch for MobileNetV2 compatibility.
+        # 1×1 conv learns the optimal channel combination end-to-end.
         x = layers.Conv2D(
             3, (1, 1), padding="same", name="channel_adapter",
             kernel_initializer="he_normal",
@@ -80,7 +96,7 @@ class ModelTrainer:
         )
         base_model._name = "mobilenetv2_backbone"
 
-        # Freeze backbone initially (Phase 1)
+        # Freeze entire backbone for Phase 1
         for layer in base_model.layers:
             layer.trainable = False
 
@@ -95,11 +111,11 @@ class ModelTrainer:
         outputs = layers.Dense(
             self.config.num_classes,
             activation="softmax",
-            dtype="float32",  # Always float32 for output stability
+            dtype="float32",   # Always float32 for output stability with mixed precision
             name="predictions",
         )(x)
 
-        model = keras.Model(inputs=inputs, outputs=outputs, name="melchior_v2")
+        model = keras.Model(inputs=inputs, outputs=outputs, name="celebi_v2")
 
         logging.info(
             f"Model built: {model.count_params():,} total params, "
@@ -108,97 +124,129 @@ class ModelTrainer:
 
         return model, base_model
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Data Pipeline
+    # ─────────────────────────────────────────────────────────────────────────
+
     def _create_tf_dataset(
         self,
-        image_dir: str,
-        norm_stats: dict,
+        npy_dir: str,
         batch_size: int,
         augment: bool = False,
         shuffle: bool = False,
+        cache_path: str = None,
     ) -> tf.data.Dataset:
         """
-        Create a tf.data.Dataset that loads images and applies
-        spectral masking preprocessing on-the-fly.
+        Build a RAM-safe tf.data pipeline from sharded TFRecords.
+
+        Memory budget (free T4: 12.7 GB system RAM, 15 GB VRAM):
+          Each 8-ch float32 image = 224×224×8×4 = 1.53 MB.
+          With conservative settings the pipeline holds ~400 MB in system RAM.
+
+        Key choices:
+          - num_parallel_calls=2   fixed workers (AUTOTUNE floods RAM on large images)
+          - prefetch(2)            fixed 2 batches (AUTOTUNE buffers 8-16 batches = 1.5 GB+)
+          - shuffle_buffer=256     256×1.53 MB = ~393 MB (AUTOTUNE had 1024 = 1.57 GB)
+          - cache_path (disk)      val/test cached on Colab's 112 GB disk, NOT in RAM
+          - drop_remainder=True    fixed batch shape → XLA reuses compiled graph
         """
-        preprocessor = SpectralPreprocessor(
-            image_size=self.config.image_size,
-            computed_stats=norm_stats,
-        )
+        # Support both sharded (new) and single-file (legacy) TFRecord layouts
+        shard_pattern = os.path.join(npy_dir, "dataset_*-of-*.tfrecord")
+        shard_files   = sorted(glob.glob(shard_pattern))
 
-        class_names = sorted(os.listdir(image_dir))
-        class_to_idx = {name: i for i, name in enumerate(class_names)}
-
-        image_paths = []
-        labels = []
-
-        for class_name in class_names:
-            class_dir = os.path.join(image_dir, class_name)
-            if not os.path.isdir(class_dir):
-                continue
-            for fname in os.listdir(class_dir):
-                fpath = os.path.join(class_dir, fname)
-                if fname.lower().endswith((".jpg", ".jpeg", ".png", ".bmp")):
-                    image_paths.append(fpath)
-                    labels.append(class_to_idx[class_name])
-
-        def load_and_preprocess(path_bytes, label):
-            """TF function to load and preprocess a single image."""
-            path_str = path_bytes.numpy().decode("utf-8")
-
-            img = cv2.imread(path_str)
-            if img is None:
-                # Return zeros if image can't be loaded
-                return np.zeros(
-                    (*self.config.image_size, self.config.input_channels),
-                    dtype=np.float32,
-                ), label
-
-            tensor = preprocessor.preprocess(img)
-
-            if augment:
-                # Random horizontal flip
-                if np.random.random() > 0.5:
-                    tensor = np.flip(tensor, axis=1)
-                # Random brightness
-                brightness = np.random.uniform(0.8, 1.2)
-                tensor[:, :, :3] *= brightness
-                # Random noise on computed channels
-                noise = np.random.normal(0, 0.02, tensor[:, :, 3:].shape)
-                tensor[:, :, 3:] += noise.astype(np.float32)
-
-            return tensor.astype(np.float32), label
-
-        def tf_load_preprocess(path, label):
-            tensor, lbl = tf.py_function(
-                load_and_preprocess,
-                [path, label],
-                [tf.float32, tf.int32],
+        if shard_files:
+            logging.info(f"Loading {len(shard_files)} TFRecord shards from {npy_dir}")
+            dataset = tf.data.Dataset.from_tensor_slices(shard_files)
+            dataset = dataset.interleave(
+                tf.data.TFRecordDataset,
+                cycle_length=min(4, len(shard_files)),
+                num_parallel_calls=2,       # Fixed — AUTOTUNE over-spawns threads on free T4
+                deterministic=False,
             )
-            tensor.set_shape(
-                [self.config.image_size[0], self.config.image_size[1],
-                 self.config.input_channels]
-            )
-            lbl = tf.one_hot(lbl, self.config.num_classes)
-            return tensor, lbl
+        else:
+            # Fall back to the legacy single-file layout
+            legacy_path = os.path.join(npy_dir, "dataset.tfrecord")
+            logging.info(f"Loading legacy single TFRecord: {legacy_path}")
+            dataset = tf.data.TFRecordDataset(legacy_path)  # Single reader is fine
 
-        dataset = tf.data.Dataset.from_tensor_slices(
-            (image_paths, labels)
-        )
+        def _parse(example_proto):
+            feature_desc = {
+                "image": tf.io.FixedLenFeature([], tf.string),
+                "label": tf.io.FixedLenFeature([], tf.int64),
+            }
+            parsed = tf.io.parse_single_example(example_proto, feature_desc)
+            # Decode float16 bytes → cast to float32 for training stability
+            image = tf.io.decode_raw(parsed["image"], tf.float16)
+            image = tf.cast(image, tf.float32)
+            image = tf.reshape(image, [*self.config.image_size, self.config.input_channels])
+            label = tf.cast(parsed["label"], tf.int32)
+            label = tf.one_hot(label, self.config.num_classes)
+            return image, label
+
+        dataset = dataset.map(_parse, num_parallel_calls=2)  # Fixed — AUTOTUNE floods RAM
+
+        # Disk cache (not RAM cache) for val/test.
+        # Caching parsed float32 tensors to Colab's 112 GB disk eliminates repeated
+        # TFRecord decode + float cast on every epoch — zero system RAM cost.
+        if cache_path is not None:
+            ensure_directory(cache_path)
+            dataset = dataset.cache(os.path.join(cache_path, "tfcache"))
+            logging.info(f"Dataset disk-cached at: {cache_path}")
 
         if shuffle:
-            dataset = dataset.shuffle(buffer_size=len(image_paths))
+            # 256 buffer = 393 MB — large enough for mixing, small enough not to OOM.
+            # (Previous value of 1024 added 1.57 GB — primary cause of session crash.)
+            dataset = dataset.shuffle(buffer_size=256, reshuffle_each_iteration=True)
 
-        dataset = dataset.map(
-            tf_load_preprocess,
-            num_parallel_calls=tf.data.AUTOTUNE,
-        )
-        dataset = dataset.batch(batch_size)
-        dataset = dataset.prefetch(tf.data.AUTOTUNE)
+        def _augment(tensor, lbl):
+            """
+            On-device augmentation for training batches.
+
+            Strategy:
+              - Geometric transforms (flip) applied to ALL channels together
+              - Colour jitter (brightness/contrast/hue) applied to RGB only
+                (spectral indices are band ratios — colour shift would corrupt them)
+              - Additive Gaussian noise on spectral channels only
+            """
+            # ── Geometric: applied to full 8-channel tensor ──
+            tensor = tf.image.random_flip_left_right(tensor)
+            tensor = tf.image.random_flip_up_down(tensor)
+
+            # Split channels after geometric transforms
+            rgb      = tensor[:, :, :3]
+            spectral = tensor[:, :, 3:]
+
+            # ── Colour jitter: RGB only ──
+            rgb = tf.image.random_brightness(rgb, max_delta=0.15)
+            rgb = tf.image.random_contrast(rgb, lower=0.8, upper=1.2)
+            rgb = tf.image.random_hue(rgb, max_delta=0.04)
+            rgb = tf.clip_by_value(rgb, -3.0, 3.0)  # Stay inside ImageNet norm range
+
+            # ── Additive noise: spectral channels only ──
+            noise = tf.random.normal(
+                shape=tf.shape(spectral), mean=0.0, stddev=0.03
+            )
+            spectral = spectral + noise
+
+            return tf.concat([rgb, spectral], axis=-1), lbl
+
+        if augment:
+            dataset = dataset.map(_augment, num_parallel_calls=2)  # Fixed — AUTOTUNE floods RAM
+
+        # drop_remainder=True → fixed-shape batches → XLA reuses the compiled graph
+        dataset = dataset.batch(batch_size, drop_remainder=True)
+        # prefetch(2): pre-loads exactly 2 batches while GPU processes current batch.
+        # AUTOTUNE here was pre-loading 8-16 batches (up to 1.5 GB) and crashing the session.
+        dataset = dataset.prefetch(2)
 
         return dataset
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Class Weights
+    # ─────────────────────────────────────────────────────────────────────────
+
     def _compute_class_weights(self, train_dir: str) -> dict:
-        """Compute class weights for imbalanced datasets."""
+        """Compute inverse-frequency class weights for imbalanced datasets."""
         from magi_vision.utils.main_utils import get_class_distribution
 
         dist = get_class_distribution(train_dir)
@@ -207,42 +255,230 @@ class ModelTrainer:
         weights = {}
 
         for i, (class_name, count) in enumerate(sorted(dist.items())):
-            if count > 0:
-                weights[i] = total / (n_classes * count)
-            else:
-                weights[i] = 1.0
+            weights[i] = total / (n_classes * count) if count > 0 else 1.0
 
         logging.info(f"Class weights: {weights}")
         return weights
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # TFLite Export
+    # ─────────────────────────────────────────────────────────────────────────
+
     def _convert_to_tflite(
         self, model: keras.Model, output_path: str
     ) -> float:
-        """Convert Keras model to TFLite with float16 quantization."""
-        logging.info("Converting model to TFLite (float16)...")
+        """
+        Convert Keras model to TFLite with float16 quantization.
 
-        converter = tf.lite.TFLiteConverter.from_keras_model(model)
+        Why clone_model() fails with mixed precision:
+          clone_model() copies the layer *configs* from the original model,
+          which includes each layer's stored dtype policy (mixed_float16).
+          Even after setting the global policy to float32 and casting weights,
+          the cloned graph still has float16 compute dtype baked in — so the
+          TFLite MLIR converter sees f16 tensors everywhere and raises
+          ERROR_NEEDS_FLEX_OPS for every op (Conv2D, Relu, BiasAdd, etc.).
+
+        Fix — build a brand new model under float32 policy:
+          _build_model() constructs fresh Keras layers that inherit the CURRENT
+          global policy (float32, set just before the call). These layers have
+          float32 compute dtype from scratch — no mixed_float16 config leaked.
+          Weights are then copied in explicitly as float32 numpy arrays.
+          The TFLite converter then sees a fully float32 graph and applies its
+          own float16 quantization at conversion time, which is the correct way.
+        """
+        logging.info("Converting model to TFLite (float16 quantization)...")
+
+        # Temporarily switch to float32 policy so the fresh model is built
+        # with float32 compute dtype on all layers
+        old_policy = mixed_precision.global_policy()
+        mixed_precision.set_global_policy("float32")
+
+        # Build a completely FRESH float32 model — do NOT use clone_model().
+        # clone_model copies layer dtype configs (compute_dtype='float16') from
+        # the mixed precision original. _build_model() under float32 policy
+        # creates genuinely float32 layers.
+        logging.info("Building fresh float32 model for TFLite export...")
+        model_fp32, _ = self._build_model()
+
+        # Copy trained weights cast explicitly to float32.
+        # model.get_weights() returns fp16 numpy arrays from mixed_float16 training.
+        fp32_weights = [np.array(w, dtype=np.float32) for w in model.get_weights()]
+        model_fp32.set_weights(fp32_weights)
+        del fp32_weights
+
+        # Convert: the graph is now entirely float32 — TFLite applies its own
+        # float16 quantization at this step (no pre-existing fp16 ops to block).
+        converter = tf.lite.TFLiteConverter.from_keras_model(model_fp32)
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.target_spec.supported_types = [tf.float16]
 
         tflite_model = converter.convert()
 
+        # Restore original mixed precision policy
+        mixed_precision.set_global_policy(old_policy)
+
         ensure_directory(os.path.dirname(output_path))
         with open(output_path, "wb") as f:
             f.write(tflite_model)
+
+        del model_fp32
+        gc.collect()
 
         size_mb = os.path.getsize(output_path) / (1024 * 1024)
         logging.info(f"TFLite model saved: {output_path} ({size_mb:.2f} MB)")
         return size_mb
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Training Phase Runner
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _run_phase(
+        self,
+        model: keras.Model,
+        phase_name: str,
+        epochs: int,
+        patience: int,
+        lr: float,
+        train_ds: tf.data.Dataset,
+        val_ds: tf.data.Dataset,
+        best_ckpt_path: str,
+        steps_per_epoch: int,
+        cosine_decay: bool = False,
+        total_cosine_steps: int = 0,
+        class_weights: dict = None,
+    ) -> dict:
+        """
+        Run one training phase with a single model.fit() call.
+
+        The model stays in GPU memory for the entire phase. Checkpointing,
+        early stopping, and LR scheduling are handled by Keras callbacks
+        entirely within the C++ training loop — no Python overhead per epoch.
+
+        Phase 1 (cosine_decay=False):
+          Fixed LR + ReduceLROnPlateau as a safety net.
+
+        Phase 2 (cosine_decay=True):
+          LearningRateScheduler with cosine annealing from base_lr → ~0.
+
+        Args:
+            model:              The Keras model to train (modified in-place).
+            phase_name:         Label for logging.
+            epochs:             Max epochs for this phase.
+            patience:           EarlyStopping patience.
+            lr:                 Initial learning rate.
+            train_ds:           Training tf.data.Dataset.
+            val_ds:             Validation tf.data.Dataset (cached).
+            best_ckpt_path:     Path to save best checkpoint.
+            steps_per_epoch:    Used only for cosine schedule calculation.
+            cosine_decay:       If True, apply cosine LR annealing.
+            total_cosine_steps: Total training steps for full cosine cycle.
+            class_weights:      Optional class weight dict.
+
+        Returns:
+            History dict from model.fit().history.
+        """
+        logging.info(f"[{phase_name}] Compiling — lr={lr:.2e}, "
+                     f"steps_per_execution={STEPS_PER_EXECUTION}")
+
+        # ── Build callback list ──
+        cb_list = [
+            callbacks.ModelCheckpoint(
+                filepath=best_ckpt_path,
+                monitor="val_accuracy",
+                save_best_only=True,
+                save_weights_only=False,
+                verbose=1,
+            ),
+            callbacks.EarlyStopping(
+                monitor="val_accuracy",
+                patience=patience,
+                restore_best_weights=True,  # Restore best weights on stop
+                verbose=1,
+            ),
+        ]
+
+        if cosine_decay and total_cosine_steps > 0:
+            # Cosine annealing: lr decays from base_lr → ~0 over total_cosine_steps.
+            # Uses `epoch` index rather than step for simplicity (close enough for
+            # fine-tuning where early stopping fires well before full decay).
+            def _cosine_lr(epoch: int) -> float:
+                elapsed_steps = epoch * steps_per_epoch
+                progress = min(elapsed_steps / max(1, total_cosine_steps), 1.0)
+                return float(lr * 0.5 * (1.0 + math.cos(math.pi * progress)))
+
+            cb_list.append(
+                callbacks.LearningRateScheduler(_cosine_lr, verbose=0)
+            )
+            logging.info(
+                f"[{phase_name}] Cosine LR schedule: "
+                f"{lr:.2e} → ~0 over {total_cosine_steps} steps"
+            )
+        else:
+            # Fixed LR with ReduceLROnPlateau as a fallback safety net
+            cb_list.append(
+                callbacks.ReduceLROnPlateau(
+                    monitor="val_loss",
+                    factor=0.5,
+                    patience=max(2, patience // 3),
+                    min_lr=1e-7,
+                    verbose=1,
+                )
+            )
+
+        # Compile once per phase — not per epoch
+        model.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=lr),
+            loss="categorical_crossentropy",
+            metrics=["accuracy"],
+            steps_per_execution=STEPS_PER_EXECUTION,
+        )
+
+        logging.info(
+            f"[{phase_name}] Starting fit — max {epochs} epochs, patience={patience}"
+        )
+        history_obj = model.fit(
+            train_ds,
+            validation_data=val_ds,
+            epochs=epochs,
+            class_weight=class_weights,
+            callbacks=cb_list,
+            verbose=1,
+        )
+
+        best_val_acc = max(history_obj.history.get("val_accuracy", [0.0]))
+        actual_epochs = len(history_obj.history.get("val_accuracy", []))
+        logging.info(
+            f"[{phase_name}] Completed {actual_epochs} epochs. "
+            f"Best val_accuracy: {best_val_acc:.4f}"
+        )
+
+        return history_obj.history
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Main Entry Point
+    # ─────────────────────────────────────────────────────────────────────────
+
     def initiate_model_training(self) -> ModelTrainerArtifact:
-        """Execute model training pipeline."""
+        """Execute the full two-phase model training pipeline."""
         logging.info("=" * 60)
         logging.info("Stage 4: MODEL TRAINING started")
         logging.info("=" * 60)
 
         try:
             ensure_directory(self.config.trained_model_dir)
+
+            # ── GPU: memory growth prevents full VRAM pre-allocation on free T4 ──
+            gpus = tf.config.list_physical_devices("GPU")
+            for gpu in gpus:
+                try:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                except RuntimeError:
+                    pass  # Already initialised — safe to skip
+
+            logging.info(f"GPUs available: {[g.name for g in gpus] or 'None (CPU mode)'}")
+
+            # Suppress verbose cuDNN / XLA INFO spam from C++ layer
+            os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
             # Enable mixed precision for GPU training
             try:
@@ -251,27 +487,32 @@ class ModelTrainer:
             except Exception:
                 logging.info("Mixed precision not available, using float32")
 
-            # Load normalization stats
+            # Load normalization stats (kept for artifact traceability)
             norm_stats = read_json_file(
                 self.transformation_artifact.normalization_stats_path
             )
 
-            # Build model
+            # ── Build model ──
             model, base_model = self._build_model()
 
-            # Create datasets
-            logging.info("Creating training datasets...")
+            # ── Build datasets ──
+            # Train: augmented + shuffled. Never cached — shuffle requires live iteration.
+            # Val:   disk-cached after first pass → skips TFRecord decode on every epoch.
+            #        Disk cache NOT RAM cache — 112 GB Colab disk vs 12.7 GB system RAM.
+            logging.info("Building tf.data pipelines...")
+            val_cache_dir = os.path.join(
+                self.config.trained_model_dir, ".val_tfcache"
+            )
             train_ds = self._create_tf_dataset(
-                self.ingestion_artifact.train_dir,
-                norm_stats,
+                self.transformation_artifact.train_npy_dir,
                 self.config.batch_size,
                 augment=True,
                 shuffle=True,
             )
             val_ds = self._create_tf_dataset(
-                self.ingestion_artifact.val_dir,
-                norm_stats,
+                self.transformation_artifact.val_npy_dir,
                 self.config.batch_size,
+                cache_path=val_cache_dir,   # ← Disk cache, not RAM cache
             )
 
             # Compute class weights
@@ -279,174 +520,165 @@ class ModelTrainer:
                 self.ingestion_artifact.train_dir
             )
 
-            # ============ PHASE 1: Train Head Only ============
-            logging.info("=" * 40)
-            logging.info("PHASE 1: Training classification head")
-            logging.info(
-                f"  Epochs: {self.config.phase1_epochs}, "
-                f"LR: {self.config.phase1_lr}"
+            steps_per_epoch = (
+                self.transformation_artifact.num_train_samples // self.config.batch_size
             )
-            logging.info("=" * 40)
+            logging.info(f"Steps per epoch: {steps_per_epoch}")
 
-            model.compile(
-                optimizer=keras.optimizers.Adam(
-                    learning_rate=self.config.phase1_lr
-                ),
-                loss="categorical_crossentropy",
-                metrics=["accuracy"],
+            # ══════════════════════════════════════════════════════════════════
+            # PHASE 1: Train Classification Head (Backbone Frozen)
+            # ══════════════════════════════════════════════════════════════════
+            logging.info("=" * 40)
+            logging.info("PHASE 1: Training classification head (backbone frozen)")
+
+            # Disable XLA JIT for Phase 1 — frozen backbone has non-XLA-friendly ops
+            try:
+                tf.config.optimizer.set_jit(False)
+            except Exception:
+                pass
+
+            phase1_ckpt = self.config.trained_model_path.replace(
+                ".keras", "_phase1_best.keras"
             )
 
-            phase1_callbacks = [
-                callbacks.EarlyStopping(
-                    monitor="val_accuracy",
-                    patience=5,
-                    restore_best_weights=True,
-                ),
-            ]
-
-            history1 = model.fit(
-                train_ds,
-                validation_data=val_ds,
+            history1 = self._run_phase(
+                model=model,
+                phase_name="Phase1",
                 epochs=self.config.phase1_epochs,
-                class_weight=class_weights,
-                callbacks=phase1_callbacks,
+                patience=self.config.phase1_epochs // 2,
+                lr=self.config.phase1_lr,
+                train_ds=train_ds,
+                val_ds=val_ds,
+                best_ckpt_path=phase1_ckpt,
+                steps_per_epoch=steps_per_epoch,
+                cosine_decay=False,
+                class_weights=class_weights,
             )
 
-            phase1_acc = max(history1.history.get("val_accuracy", [0]))
-            logging.info(f"Phase 1 best val accuracy: {phase1_acc:.4f}")
+            phase1_acc = max(history1.get("val_accuracy", [0.0]))
+            logging.info(f"Phase 1 complete — best val_accuracy: {phase1_acc:.4f}")
 
-            # ============ PHASE 2: Fine-tune Top Layers ============
+            # ══════════════════════════════════════════════════════════════════
+            # PHASE 2: Fine-tune Top Backbone Layers (Cosine LR Decay)
+            # ══════════════════════════════════════════════════════════════════
             logging.info("=" * 40)
-            logging.info("PHASE 2: Fine-tuning backbone")
-            logging.info(
-                f"  Unfreezing from layer {self.config.unfreeze_from_layer}, "
-                f"Epochs: {self.config.phase2_epochs}, "
-                f"LR: {self.config.phase2_lr}"
+            logging.info("PHASE 2: Fine-tuning backbone top layers")
+
+            # Unfreeze top backbone layers — keep BatchNorm frozen (critical for fine-tuning
+            # stability: prevents domain shift from small fine-tune batches resetting BN stats)
+            backbone_name = next(
+                l.name for l in model.layers if "mobilenet" in l.name.lower()
             )
-            logging.info("=" * 40)
-
-            # Unfreeze top layers of backbone
+            base_model = model.get_layer(backbone_name)
+            unfrozen = 0
             for layer in base_model.layers[self.config.unfreeze_from_layer:]:
                 if not isinstance(layer, layers.BatchNormalization):
                     layer.trainable = True
+                    unfrozen += 1
 
-            model.compile(
-                optimizer=keras.optimizers.Adam(
-                    learning_rate=self.config.phase2_lr
-                ),
-                loss="categorical_crossentropy",
-                metrics=["accuracy"],
+            total_trainable = sum(1 for l in model.layers if l.trainable)
+            logging.info(
+                f"Phase 2: {unfrozen} backbone layers unfrozen, "
+                f"{total_trainable} total trainable layers"
             )
 
-            phase2_callbacks = [
-                callbacks.EarlyStopping(
-                    monitor="val_accuracy",
-                    patience=7,
-                    restore_best_weights=True,
-                ),
-                callbacks.ReduceLROnPlateau(
-                    monitor="val_loss",
-                    factor=0.5,
-                    patience=3,
-                    min_lr=1e-7,
-                ),
-                callbacks.ModelCheckpoint(
-                    self.config.trained_model_path,
-                    monitor="val_accuracy",
-                    save_best_only=True,
-                ),
-            ]
+            # Enable XLA JIT for Phase 2 — all ops now in the fine-tune graph
+            try:
+                tf.config.optimizer.set_jit(True)
+                logging.info("XLA JIT enabled for Phase 2")
+            except Exception:
+                pass
 
-            history2 = model.fit(
-                train_ds,
-                validation_data=val_ds,
+            total_phase2_steps = self.config.phase2_epochs * steps_per_epoch
+
+            history2 = self._run_phase(
+                model=model,
+                phase_name="Phase2",
                 epochs=self.config.phase2_epochs,
-                class_weight=class_weights,
-                callbacks=phase2_callbacks,
+                patience=7,
+                lr=self.config.phase2_lr,
+                train_ds=train_ds,
+                val_ds=val_ds,
+                best_ckpt_path=self.config.trained_model_path,
+                steps_per_epoch=steps_per_epoch,
+                cosine_decay=True,
+                total_cosine_steps=total_phase2_steps,
+                class_weights=class_weights,
             )
 
-            # Load best model from Phase 2
-            model = keras.models.load_model(self.config.trained_model_path)
-            phase2_acc = max(history2.history.get("val_accuracy", [0]))
-            logging.info(f"Phase 2 best val accuracy: {phase2_acc:.4f}")
+            phase2_acc = max(history2.get("val_accuracy", [0.0]))
+            logging.info(f"Phase 2 complete — best val_accuracy: {phase2_acc:.4f}")
 
-            # ============ Evaluate on Test Set ============
+            # ══════════════════════════════════════════════════════════════════
+            # EVALUATE on Test Set
+            # ══════════════════════════════════════════════════════════════════
+            test_cache_dir = os.path.join(
+                self.config.trained_model_dir, ".test_tfcache"
+            )
             test_ds = self._create_tf_dataset(
-                self.ingestion_artifact.test_dir,
-                norm_stats,
+                self.transformation_artifact.test_npy_dir,
                 self.config.batch_size,
+                cache_path=test_cache_dir,  # ← Disk cache, not RAM cache
             )
 
-            test_results = model.evaluate(test_ds, verbose=0)
+            logging.info("Evaluating on test set...")
+            test_results = model.evaluate(test_ds, verbose=1)
             test_accuracy = test_results[1]
             logging.info(f"Test accuracy: {test_accuracy:.4f}")
 
-            # ============ Compute Detailed Metrics ============
-            y_true = []
-            y_pred = []
+            # ── Detailed per-class metrics ──
+            y_true, y_pred = [], []
             for batch_x, batch_y in test_ds:
                 preds = model.predict(batch_x, verbose=0)
                 y_pred.extend(np.argmax(preds, axis=1))
                 y_true.extend(np.argmax(batch_y.numpy(), axis=1))
 
-            from sklearn.metrics import (
-                f1_score, precision_score, recall_score
-            )
+            from sklearn.metrics import f1_score, precision_score, recall_score
 
             y_true = np.array(y_true)
             y_pred = np.array(y_pred)
 
-            macro_f1 = f1_score(y_true, y_pred, average="macro", zero_division=0)
-            macro_precision = precision_score(
-                y_true, y_pred, average="macro", zero_division=0
-            )
-            macro_recall = recall_score(
-                y_true, y_pred, average="macro", zero_division=0
-            )
+            macro_f1        = f1_score(y_true, y_pred, average="macro", zero_division=0)
+            macro_precision = precision_score(y_true, y_pred, average="macro", zero_division=0)
+            macro_recall    = recall_score(y_true, y_pred, average="macro", zero_division=0)
 
-            per_class_f1_arr = f1_score(
-                y_true, y_pred, average=None, zero_division=0
-            )
+            per_class_f1_arr = f1_score(y_true, y_pred, average=None, zero_division=0)
             per_class_f1 = {
                 self.config.class_names[i]: float(per_class_f1_arr[i])
                 for i in range(min(len(per_class_f1_arr), len(self.config.class_names)))
             }
 
             logging.info(
-                f"Test metrics: F1={macro_f1:.4f}, "
-                f"Precision={macro_precision:.4f}, "
-                f"Recall={macro_recall:.4f}"
+                f"Test metrics — F1: {macro_f1:.4f} | "
+                f"Precision: {macro_precision:.4f} | "
+                f"Recall: {macro_recall:.4f}"
             )
             logging.info(f"Per-class F1: {per_class_f1}")
 
-            # ============ TFLite Conversion ============
+            # ══════════════════════════════════════════════════════════════════
+            # TFLite Conversion
+            # ══════════════════════════════════════════════════════════════════
             self._convert_to_tflite(model, self.config.tflite_model_path)
 
-            # ============ Save Training History ============
+            # ══════════════════════════════════════════════════════════════════
+            # Persist Artefacts
+            # ══════════════════════════════════════════════════════════════════
             full_history = {}
-            for key in history1.history:
-                full_history[f"phase1_{key}"] = [
-                    float(v) for v in history1.history[key]
-                ]
-            for key in history2.history:
-                full_history[f"phase2_{key}"] = [
-                    float(v) for v in history2.history[key]
-                ]
+            for key, vals in history1.items():
+                full_history[f"phase1_{key}"] = [float(v) for v in vals]
+            for key, vals in history2.items():
+                full_history[f"phase2_{key}"] = [float(v) for v in vals]
             full_history["test_accuracy"] = float(test_accuracy)
-            full_history["test_f1"] = float(macro_f1)
+            full_history["test_f1"]       = float(macro_f1)
 
-            write_json_file(
-                self.config.training_history_path, full_history, replace=True
-            )
+            write_json_file(self.config.training_history_path, full_history, replace=True)
 
-            # ============ Save Class Mapping ============
             class_mapping = {
                 str(i): name for i, name in enumerate(self.config.class_names)
             }
-            write_json_file(
-                self.config.class_mapping_path, class_mapping, replace=True
-            )
+            write_json_file(self.config.class_mapping_path, class_mapping, replace=True)
 
+            # ── Build and return artifact ──
             metric_artifact = ClassificationMetricArtifact(
                 accuracy=float(test_accuracy),
                 f1_score=float(macro_f1),
@@ -463,8 +695,8 @@ class ModelTrainer:
                 metric_artifact=metric_artifact,
             )
 
-            logging.info(f"Model Trainer artifact: {artifact}")
-            logging.info("Stage 4: MODEL TRAINING completed")
+            logging.info(f"ModelTrainerArtifact: {artifact}")
+            logging.info("Stage 4: MODEL TRAINING completed successfully")
             return artifact
 
         except Exception as e:

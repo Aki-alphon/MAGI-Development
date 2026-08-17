@@ -59,6 +59,9 @@ class DataTransformationConfig:
     normalization_stats_path: str = os.path.join(
         transform_config_dir, DATA_TRANSFORMATION_NORM_STATS_FILE
     )
+    train_npy_dir: str = os.path.join(data_transformation_dir, "train_npy")
+    val_npy_dir: str = os.path.join(data_transformation_dir, "val_npy")
+    test_npy_dir: str = os.path.join(data_transformation_dir, "test_npy")
     image_size: tuple = IMAGE_SIZE
     clahe_clip_limit: float = CLAHE_CLIP_LIMIT
     clahe_grid_size: tuple = CLAHE_GRID_SIZE

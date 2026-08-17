@@ -34,13 +34,13 @@ MAGI OS is a **purpose-built, minimal Linux-based operating system** designed to
 
 It is **not** a general-purpose OS. Every decision — from the init system to the IPC mechanism to the message format — was made to serve this single mission.
 
-**Named after the MAGI supercomputer** from Neon Genesis Evangelion — three specialized systems (Melchior, Balthasar, Caspar) each making independent decisions that are fused into one final output.
+**Named after the MAGI supercomputer** from Neon Genesis Evangelion — three specialized systems (Celebi, Gengar, Lugia) each making independent decisions that are fused into one final output.
 
 | MAGI Node | Role | CPU Core |
 |---|---|---|
-| **Melchior** (MAGI-1) | Object / Target Detection | Core 1 |
-| **Balthasar** (MAGI-2) | Scene Analysis + Motion | Core 2 |
-| **Caspar** (MAGI-3) | Sensor Fusion + Decisions | Core 3 |
+| **Celebi** (MAGI-1) | Object / Target Detection | Core 1 |
+| **Gengar** (MAGI-2) | Scene Analysis + Motion | Core 2 |
+| **Lugia** (MAGI-3) | Sensor Fusion + Decisions | Core 3 |
 | **Sensor Hub** | All hardware I/O | Core 0 |
 
 ---
@@ -110,9 +110,9 @@ MAGI OS extracts the **concepts** from ROS2 (typed messages, lifecycle nodes, Qo
 │                      MAGI OS v2                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  APPLICATION LAYER (one process per CPU core)                   │
-│  Core 1: MAGI-1 Melchior    → Object Detection (TFLite)         │
-│  Core 2: MAGI-2 Balthasar   → Scene Analysis   (TFLite)         │
-│  Core 3: MAGI-3 Caspar      → Fusion + Decision Engine          │
+│  Core 1: MAGI-1 Celebi    → Object Detection (TFLite)         │
+│  Core 2: MAGI-2 Gengar   → Scene Analysis   (TFLite)         │
+│  Core 3: MAGI-3 Lugia      → Fusion + Decision Engine          │
 │  Core 0: Sensor Hub         → All hardware I/O                  │
 │  Core 0: Camera Capture     → Camera → shared memory            │
 ├─────────────────────────────────────────────────────────────────┤
@@ -145,11 +145,11 @@ Sensors (I2C/SPI/UART/GPIO)
 camera_capture.py → POSIX shared memory
         │                   │
         │                   ▼
-        │         melchior.py (Core 1) → /detections topic ──┐
+        │         celebi.py (Core 1) → /detections topic ──┐
         │                                                     │
-        └──────→ balthasar.py (Core 2) → /scene topic ────────┤
+        └──────→ gengar.py (Core 2) → /scene topic ────────┤
                                                               │
-                                              caspar.py (Core 3) → /decision topic
+                                              lugia.py (Core 3) → /decision topic
                                                               │
                                               GPIO alert · UART · log file
 ```
@@ -196,13 +196,13 @@ MAGI/OS/
 │   │   └── camera_capture.py        Camera → shared memory writer
 │   │
 │   ├── magi1/
-│   │   └── melchior.py              Detection node (Core 1)
+│   │   └── celebi.py              Detection node (Core 1)
 │   │
 │   ├── magi2/
-│   │   └── balthasar.py             Scene analysis node (Core 2)
+│   │   └── gengar.py             Scene analysis node (Core 2)
 │   │
 │   ├── magi3/
-│   │   └── caspar.py                Fusion + decision node (Core 3)
+│   │   └── lugia.py                Fusion + decision node (Core 3)
 │   │
 │   ├── watchdog.py                  Process supervisor
 │   └── status_monitor.py            Terminal dashboard
@@ -227,9 +227,9 @@ MAGI/OS/
     │   ├── RPi/GPIO.py
     │   └── tflite_runtime/interpreter.py
     └── dummy_models/
-        ├── melchior.tflite
-        ├── balthasar.tflite
-        └── caspar.tflite
+        ├── celebi.tflite
+        ├── gengar.tflite
+        └── lugia.tflite
 ```
 
 ---
@@ -274,7 +274,7 @@ MAGI/OS/
 ### `core/transforms.py` — TF Frame Registry
 **What:** Coordinate transform registry for sensor frames.  
 **Why:** IMU is mounted 5cm above robot center. Camera is 10cm forward and tilted 15°. ToF is at the front. For accurate sensor fusion, MAGI-3 needs to know where each sensor is in 3D space.  
-**How:** Static transforms defined in `build_default_tf()`. Uses quaternion math for 3D rotations. Balthasar uses the IMU frame transform when processing motion data.  
+**How:** Static transforms defined in `build_default_tf()`. Uses quaternion math for 3D rotations. Gengar uses the IMU frame transform when processing motion data.  
 **Where:** Edit `src/core/transforms.py` to match your physical hardware layout.
 
 ### `core/recorder.py` — Message Recorder
@@ -319,19 +319,19 @@ MAGI/OS/
 
 ## 8. AI Inference Nodes
 
-### MAGI-1 Melchior — `magi1/melchior.py`
+### MAGI-1 Celebi — `magi1/celebi.py`
 **What:** Object detection using YOLOv8-nano or MobileNet-SSD TFLite.  
 **Why:** Detects objects/targets in the camera frame at ~10 Hz.  
 **How:** Reads camera frame from shared memory → resize → normalize → TFLite inference → parse boxes/classes/scores → publish `DetectionMsg` to `/detections`.  
 **Core:** 1 | **Input:** 320×320 RGB | **Output:** list of `Detection(label, confidence, bbox)`
 
-### MAGI-2 Balthasar — `magi2/balthasar.py`
+### MAGI-2 Gengar — `magi2/gengar.py`
 **What:** Scene classification + IMU motion analysis using EfficientNet-Lite TFLite.  
 **Why:** Understands the context of the environment (restricted zone, emergency, crowded, etc.) and whether the platform is moving.  
 **How:** Camera frame → ImageNet normalization → TFLite inference → softmax scene class. IMU accel data → motion magnitude + jerk calculation. Anomaly score = uncertainty × motion.  
 **Core:** 2 | **Input:** 224×224 RGB | **Output:** `SceneMsg(scene, anomaly_score, motion)`
 
-### MAGI-3 Caspar — `magi3/caspar.py`
+### MAGI-3 Lugia — `magi3/lugia.py`
 **What:** Sensor fusion and decision engine.  
 **Why:** Combines detections + scene + raw sensor data into one prioritized action decision.  
 **How:** Subscribes to `/detections`, `/scene`, `/sensors`. Rule-based engine evaluates 6 priority rules. Publishes `DecisionMsg` to `/decision` with TRANSIENT_LOCAL QoS (new subscribers always get the last decision).  
@@ -423,9 +423,9 @@ sudo bash ~/magi-os/setup/03_configure_boot.sh
 sudo reboot
 
 # Place your TFLite model files
-sudo cp melchior.tflite  /opt/magi/models/
-sudo cp balthasar.tflite /opt/magi/models/
-sudo cp caspar.tflite    /opt/magi/models/
+sudo cp celebi.tflite  /opt/magi/models/
+sudo cp gengar.tflite /opt/magi/models/
+sudo cp lugia.tflite    /opt/magi/models/
 
 # Edit config: enable your sensors and camera
 sudo nano /opt/magi/config/config.yaml
@@ -491,9 +491,9 @@ magi-cli tf frames                       # List all frame names
 | Diagnostics monitor | ~3 MB |
 | TF store + recorder | ~7 MB |
 | **Middleware Total** | **~22 MB** |
-| MAGI-1 Melchior (YOLOv8-nano TFLite) | ~300 MB |
-| MAGI-2 Balthasar (EfficientNet-Lite) | ~200 MB |
-| MAGI-3 Caspar (LSTM / rule engine) | ~150 MB |
+| MAGI-1 Celebi (YOLOv8-nano TFLite) | ~300 MB |
+| MAGI-2 Gengar (EfficientNet-Lite) | ~200 MB |
+| MAGI-3 Lugia (LSTM / rule engine) | ~150 MB |
 | Inference buffers + preprocessing | ~400 MB |
 | **Models Total** | **~1050 MB** |
 | **TOTAL USED** | **~1252 MB** |
@@ -545,9 +545,9 @@ Replace placeholder `.tflite` files in `/opt/magi/models/`:
 
 | File | Replace With |
 |---|---|
-| `melchior.tflite` | YOLOv8-nano / MobileNet-SSD TFLite detection model |
-| `balthasar.tflite` | EfficientNet-Lite / custom scene classifier |
-| `caspar.tflite` | LSTM sequence model (optional — rule engine works without it) |
+| `celebi.tflite` | YOLOv8-nano / MobileNet-SSD TFLite detection model |
+| `gengar.tflite` | EfficientNet-Lite / custom scene classifier |
+| `lugia.tflite` | LSTM sequence model (optional — rule engine works without it) |
 
 **Convert from PyTorch:**
 ```bash
@@ -561,7 +561,7 @@ import tensorflow as tf
 converter = tf.lite.TFLiteConverter.from_saved_model("my_model")
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
 tflite_model = converter.convert()
-open("melchior.tflite", "wb").write(tflite_model)
+open("celebi.tflite", "wb").write(tflite_model)
 ```
 
 ---

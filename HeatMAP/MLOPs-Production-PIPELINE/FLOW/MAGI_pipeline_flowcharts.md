@@ -41,7 +41,7 @@ graph TD
     end
 ```
 
-## 2. On-Robot Inference Pipeline (Melchior System)
+## 2. On-Robot Inference Pipeline (Celebi System)
 
 ```mermaid
 graph TD
@@ -60,7 +60,7 @@ graph TD
     M --> SM[EMA Temporal Smoothing]
     SM --> H[Spatial Health Grid Update]
     
-    H --> A{Caspar Action}
+    H --> A{Lugia Action}
     A -- Healthy --> A1[IDLE: Walk 0.3 m/s]
     A -- Mild Stress --> A2[TRACK: Walk 0.15 m/s]
     A -- Moderate Stress --> A3[ALERT: Flag GPS]

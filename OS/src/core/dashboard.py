@@ -29,6 +29,7 @@ except (AttributeError, OSError):
 
 from common.logger import get_logger
 from core.messages import decode
+from core.lifecycle import LifecycleNode
 
 log = get_logger("dashboard")
 
@@ -301,9 +302,9 @@ async def serve_dashboard():
                     </div>
                     
                     <div class="grid grid-cols-2 gap-4 mt-2">
-                        <!-- Core 2 Balthasar (Trigger) -->
+                        <!-- Core 2 Gengar (Trigger) -->
                         <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-2">
-                            <span class="text-[10px] text-slate-500 font-mono">CORE 2 (BALTHASAR)</span>
+                            <span class="text-[10px] text-slate-500 font-mono">CORE 2 (GENGAR)</span>
                             <div class="flex items-center justify-between">
                                 <span class="font-semibold text-slate-300">Trigger Model</span>
                                 <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 glow-green pulse"></span>
@@ -311,14 +312,14 @@ async def serve_dashboard():
                             <span class="text-xs text-emerald-400 font-mono bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10 text-center">CONTINUOUS</span>
                         </div>
                         
-                        <!-- Core 1 Melchior (Gated Node) -->
+                        <!-- Core 1 Celebi (Gated Node) -->
                         <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800/80 flex flex-col gap-2">
-                            <span class="text-[10px] text-slate-500 font-mono">CORE 1 (MELCHIOR)</span>
+                            <span class="text-[10px] text-slate-500 font-mono">CORE 1 (CELEBI)</span>
                             <div class="flex items-center justify-between">
                                 <span class="font-semibold text-slate-300">Heavy Model</span>
-                                <span id="melchior-gating-indicator" class="h-2.5 w-2.5 rounded-full bg-amber-500 glow-orange pulse"></span>
+                                <span id="celebi-gating-indicator" class="h-2.5 w-2.5 rounded-full bg-amber-500 glow-orange pulse"></span>
                             </div>
-                            <span id="melchior-gating-state" class="text-xs text-amber-400 font-mono bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 text-center">SLEEPING (INACTIVE)</span>
+                            <span id="celebi-gating-state" class="text-xs text-amber-400 font-mono bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 text-center">SLEEPING (INACTIVE)</span>
                         </div>
                     </div>
 
@@ -421,7 +422,7 @@ async def serve_dashboard():
                         
                         <div class="flex flex-col gap-4 mt-1">
                             <div>
-                                <label class="text-[11px] font-mono text-slate-500 block mb-1">MELCHIOR CONFIDENCE THRESHOLD</label>
+                                <label class="text-[11px] font-mono text-slate-500 block mb-1">CELEBI CONFIDENCE THRESHOLD</label>
                                 <div class="flex gap-2">
                                     <input type="number" step="0.05" min="0.1" max="0.95" id="param-conf" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-sm font-mono flex-1 focus:outline-none focus:border-indigo-500 text-slate-300" value="0.40">
                                     <button onclick="updateParam('magi1', 'confidence_threshold', 'param-conf')" class="bg-indigo-600 hover:bg-indigo-700 text-slate-100 text-xs font-semibold px-4 rounded-lg transition-colors border border-indigo-500/30">SET</button>
@@ -530,9 +531,9 @@ async def serve_dashboard():
                     document.getElementById('metric-anomaly').innerText = sceneData.anomaly_score !== undefined ? sceneData.anomaly_score.toFixed(3) : '0.000';
 
                     // Update gating elements
-                    const melchiorActive = telemetry.diagnostics && telemetry.diagnostics.magi1 && telemetry.diagnostics.magi1.state === 'ACTIVE';
-                    const melchiorIndicator = document.getElementById('melchior-gating-indicator');
-                    const melchiorStateText = document.getElementById('melchior-gating-state');
+                    const celebiActive = telemetry.diagnostics && telemetry.diagnostics.magi1 && telemetry.diagnostics.magi1.state === 'ACTIVE';
+                    const celebiIndicator = document.getElementById('celebi-gating-indicator');
+                    const celebiStateText = document.getElementById('celebi-gating-state');
                     const stablePlantIndicator = document.getElementById('stable-plant-detected');
 
                     if (sceneVal === 'stable_plant') {
@@ -543,14 +544,14 @@ async def serve_dashboard():
                         stablePlantIndicator.className = 'text-rose-400';
                     }
 
-                    if (melchiorActive) {
-                        melchiorIndicator.className = 'h-2.5 w-2.5 rounded-full bg-emerald-500 glow-green pulse';
-                        melchiorStateText.innerText = 'PROCESSING (ACTIVE)';
-                        melchiorStateText.className = 'text-xs text-emerald-400 font-mono bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10 text-center';
+                    if (celebiActive) {
+                        celebiIndicator.className = 'h-2.5 w-2.5 rounded-full bg-emerald-500 glow-green pulse';
+                        celebiStateText.innerText = 'PROCESSING (ACTIVE)';
+                        celebiStateText.className = 'text-xs text-emerald-400 font-mono bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10 text-center';
                     } else {
-                        melchiorIndicator.className = 'h-2.5 w-2.5 rounded-full bg-amber-500 glow-orange pulse';
-                        melchiorStateText.innerText = 'SLEEPING (INACTIVE)';
-                        melchiorStateText.className = 'text-xs text-amber-400 font-mono bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 text-center';
+                        celebiIndicator.className = 'h-2.5 w-2.5 rounded-full bg-amber-500 glow-orange pulse';
+                        celebiStateText.innerText = 'SLEEPING (INACTIVE)';
+                        celebiStateText.className = 'text-xs text-amber-400 font-mono bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 text-center';
                     }
 
                     // Update Chart
@@ -576,9 +577,9 @@ async def serve_dashboard():
                     // Core nodes mapping
                     const nodes = [
                         { id: 'sensor_hub', title: 'Sensor Hub (Core 0)', desc: 'Sensor publishing & GPIO interface' },
-                        { id: 'magi1', title: 'Melchior (Core 1)', desc: 'Disease detection inference' },
-                        { id: 'magi2', title: 'Balthasar (Core 2)', desc: 'Trigger & Scene classification' },
-                        { id: 'magi3', title: 'Caspar (Core 3)', desc: 'Fusion decision engine' },
+                        { id: 'magi1', title: 'Celebi (Core 1)', desc: 'Disease detection inference' },
+                        { id: 'magi2', title: 'Gengar (Core 2)', desc: 'Trigger & Scene classification' },
+                        { id: 'magi3', title: 'Lugia (Core 3)', desc: 'Fusion decision engine' },
                         { id: 'batch_manager', title: 'Batch Manager (Core 0)', desc: 'Parquet & Zarr Zstd compression' },
                         { id: 'dashboard', title: 'Web Dashboard (Core 0)', desc: 'Lightweight observer endpoint' }
                     ];

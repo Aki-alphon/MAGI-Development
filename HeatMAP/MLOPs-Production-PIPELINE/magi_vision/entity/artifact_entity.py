@@ -28,6 +28,9 @@ class DataTransformationArtifact:
     num_train_samples: int
     num_val_samples: int
     num_test_samples: int
+    train_npy_dir: str
+    val_npy_dir: str
+    test_npy_dir: str
 
 
 @dataclass

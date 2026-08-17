@@ -91,7 +91,7 @@ def main():
         print(f"║  RAM  [{bar(ram_pct)}] {ram_pct:5.1f}%  {used_mb:.0f}/{total_mb:.0f} MB")
 
         # CPU per core
-        core_labels = ["OS+Sensors", "MAGI-1 Melchior", "MAGI-2 Balthasar", "MAGI-3 Caspar"]
+        core_labels = ["OS+Sensors", "MAGI-1 Celebi", "MAGI-2 Gengar", "MAGI-3 Lugia"]
         for i, (pct, label) in enumerate(zip(cores[:4], core_labels)):
             print(f"║  C{i}  [{bar(pct)}] {pct:5.1f}%  {label}")
 

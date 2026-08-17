@@ -39,15 +39,20 @@ class ModelPusher:
     def _generate_manifest(self, version: str, dest_dir: str) -> str:
         """Generate deployment manifest with model metadata."""
         manifest = {
-            "model_name": "melchior",
+            "model_name": "celebi",
             "version": version,
             "timestamp": datetime.now().isoformat(),
-            "architecture": "MobileNetV2_6ch",
-            "input_shape": [224, 224, 6],
-            "input_channels": ["R", "G", "B", "ExG", "GRVI", "L_star"],
+            "architecture": "MobileNetV2_8ch",
+            "input_shape": [224, 224, 8],
+            "input_channels": ["R", "G", "B", "ExG", "GRVI", "VARI", "GLI", "NGBDI"],
             "num_classes": 4,
-            "class_names": ["healthy", "mild_stress", "moderate_stress", "severe_stress"],
-            "health_scores": [1.0, 0.7, 0.4, 0.15],
+            "class_names": [
+                "baseline_healthy",
+                "early_nitrogen_stress",
+                "active_chlorosis",
+                "severe_deficiency",
+            ],
+            "health_scores": [1.0, 0.68, 0.35, 0.05],
             "quantization": "float16",
             "metrics": {
                 "keras_accuracy": self.evaluation_artifact.keras_accuracy,
@@ -63,10 +68,10 @@ class ModelPusher:
                 "target_device": "raspberry_pi_4b",
             },
             "files": {
-                "tflite_model": "melchior.tflite",
+                "tflite_model": "celebi.tflite",
                 "class_mapping": "class_mapping.json",
-                "preprocessing_config": "preprocessing_config.json",
                 "normalization_stats": "normalization_stats.json",
+                "deployment_manifest": "deployment_manifest.json",
             },
         }
 
@@ -94,7 +99,7 @@ class ModelPusher:
             ensure_directory(export_dir)
 
             # Step 1: Copy TFLite model
-            tflite_dest = os.path.join(export_dir, "melchior.tflite")
+            tflite_dest = os.path.join(export_dir, "celebi.tflite")
             shutil.copy2(self.trainer_artifact.tflite_model_path, tflite_dest)
             logging.info(f"TFLite model → {tflite_dest}")
 

@@ -90,7 +90,7 @@ class SensorMsg:
     adc:     dict[str, float]   = field(default_factory=dict)
 
 
-# ─── /detections topic (MAGI-1 output) ──────────────────────────────────────
+# ─── /detections topic (legacy — kept for Gengar compatibility) ──────────
 
 @dataclass
 class Detection:
@@ -103,13 +103,50 @@ class Detection:
 
 @dataclass
 class DetectionMsg:
-    """Published on /detections by MAGI-1 Melchior."""
+    """Published on /detections — kept for backward compatibility."""
     MSG_TYPE = "vision/detections/v1"
     header:     Header          = field(default_factory=Header)
     detections: list[Detection] = field(default_factory=list)
     count:      int             = 0
     fps:        float           = 0.0
     latency_ms: float           = 0.0
+
+
+# ─── /canopy_health topic (MAGI-1 Celebi — plant health heatmap) ───────────
+
+# Plant health class names (must match training label order)
+PLANT_CLASS_NAMES = ["baseline_healthy", "early_nitrogen_stress", "active_chlorosis", "severe_deficiency"]
+# Corresponding health score weights: baseline_healthy=1.0, severe_deficiency=0.05
+PLANT_HEALTH_SCORES = [1.0, 0.68, 0.35, 0.05]
+
+
+@dataclass
+class HealthTile:
+    """Per-tile result from the 4×3 canopy grid analysis."""
+    row:             int   = 0
+    col:             int   = 0
+    is_vegetation:   bool  = False
+    predicted_class: str   = "unknown"
+    health_score:    float = 1.0     # 0.0 (severe) → 1.0 (healthy)
+    confidence:      float = 0.0
+
+
+@dataclass
+class CanopyHealthMsg:
+    """Published on /canopy_health by MAGI-1 Celebi."""
+    MSG_TYPE = "vision/canopy_health/v1"
+    header:               Header          = field(default_factory=Header)
+    tiles:                list            = field(default_factory=list)  # list[HealthTile dicts]
+    grid_rows:            int             = 3
+    grid_cols:            int             = 4
+    vegetation_coverage:  float           = 0.0   # fraction of tiles with plants
+    mean_health:          float           = 1.0   # EMA-smoothed average (0–1)
+    min_health:           float           = 1.0   # worst tile this frame
+    stress_distribution:  dict            = field(default_factory=dict)  # class→count
+    recommended_action:   str             = "IDLE"
+    trend_slope:          float           = 0.0
+    latency_ms:           float           = 0.0
+    fps:                  float           = 0.0
 
 
 # ─── /scene topic (MAGI-2 output) ──────────────────────────────────────────
@@ -124,7 +161,7 @@ class MotionState:
 
 @dataclass
 class SceneMsg:
-    """Published on /scene by MAGI-2 Balthasar."""
+    """Published on /scene by MAGI-2 Gengar."""
     MSG_TYPE = "vision/scene/v1"
     header:        Header      = field(default_factory=Header)
     scene:         str         = "unknown"
@@ -140,7 +177,7 @@ class SceneMsg:
 
 @dataclass
 class DecisionMsg:
-    """Published on /decision by MAGI-3 Caspar. TRANSIENT_LOCAL QoS."""
+    """Published on /decision by MAGI-3 Lugia. TRANSIENT_LOCAL QoS."""
     MSG_TYPE = "fusion/decision/v1"
     header:        Header          = field(default_factory=Header)
     action:        str             = "IDLE"

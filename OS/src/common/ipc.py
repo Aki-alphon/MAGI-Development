@@ -94,7 +94,7 @@ class Subscriber:
 class Pusher:
     """
     ZeroMQ PUSH socket.
-    Used by: MAGI-1, MAGI-2 → send results to MAGI-3 (Caspar).
+    Used by: MAGI-1, MAGI-2 → send results to MAGI-3 (Lugia).
     """
 
     def __init__(self, address: str):

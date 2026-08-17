@@ -1,36 +1,38 @@
 # MAGI Vision Model Configuration
 # =================================
-# Melchior — Canopy-Level Plant Health Classifier
+# Celebi — Canopy-Level Plant Health Classifier
 
 model:
-  name: melchior_v2
+  name: celebi_v2
   backbone: mobilenetv2
   pretrained: imagenet
 
   input:
     height: 224
     width: 224
-    channels: 6
+    channels: 8
     channel_names:
       - R
       - G
       - B
       - ExG
       - GRVI
-      - L_star
+      - VARI
+      - GLI
+      - NGBDI
 
   output:
     num_classes: 4
     class_names:
-      - healthy
-      - mild_stress
-      - moderate_stress
-      - severe_stress
+      - baseline_healthy
+      - early_nitrogen_stress
+      - active_chlorosis
+      - severe_deficiency
     health_scores:
       - 1.0
-      - 0.7
-      - 0.4
-      - 0.15
+      - 0.68
+      - 0.35
+      - 0.05
 
   head:
     dense_units: 256
@@ -41,30 +43,30 @@ training:
   phase1:
     description: "Train classification head only"
     freeze_backbone: true
-    epochs: 15
+    epochs: 10
     learning_rate: 0.001
     optimizer: adam
 
   phase2:
     description: "Fine-tune top backbone layers"
     unfreeze_from_layer: 100
-    epochs: 30
+    epochs: 15
     learning_rate: 0.00001
     optimizer: adam
 
-  batch_size: 32
+  batch_size: 64
   mixed_precision: true
   loss: categorical_crossentropy
 
   callbacks:
     early_stopping:
       monitor: val_accuracy
-      patience: 7
+      patience: 5
       restore_best_weights: true
     reduce_lr:
       monitor: val_loss
       factor: 0.5
-      patience: 3
+      patience: 2
       min_lr: 0.0000001
     model_checkpoint:
       monitor: val_accuracy

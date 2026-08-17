@@ -61,9 +61,9 @@ docker compose -f docker/docker-compose.yml down
 |-----------|---------|-------------------|
 | `magi_sensor_hub` | Reads sensors, publishes ZMQ | `smbus2` → sine-wave IMU, `pigpio` → random GPIO events |
 | `magi_camera` | Writes camera frames to shared mem | Disabled (camera=false in test_config) |
-| `magi1_melchior` | Object detection inference | `tflite_runtime` → returns 3 fake detections |
-| `magi2_balthasar` | Scene analysis inference | `tflite_runtime` → returns random scene class |
-| `magi3_caspar` | Fusion + decision engine | Rule engine (no mock needed) |
+| `magi1_celebi` | Object detection inference | `tflite_runtime` → returns 3 fake detections |
+| `magi2_gengar` | Scene analysis inference | `tflite_runtime` → returns random scene class |
+| `magi3_lugia` | Fusion + decision engine | Rule engine (no mock needed) |
 
 ---
 
@@ -74,12 +74,12 @@ After `docker compose up`, you should see:
 ```
 magi_sensor_hub  | [sensor_hub] INFO — SensorHub ready — publishing to ipc:///tmp/magi/sensor_pub.sock
 magi_sensor_hub  | [sensor_hub] INFO — IMU MPU-6050 initialized at I2C 0x68
-magi1_melchior   | [magi1] INFO — Loading model: /opt/magi/models/melchior.tflite
-magi1_melchior   | [mock_tflite] Interpreter stub for 'melchior'
-magi1_melchior   | [magi1] INFO — Melchior ready — input 320x320, conf≥0.4
-magi2_balthasar  | [magi2] INFO — Balthasar ready — input 224x224
-magi3_caspar     | [magi3] INFO — Caspar ready — fusion engine active
-magi3_caspar     | [magi3] INFO — Decision → TRACK (priority=4) | Tracking 3 object(s)
+magi1_celebi   | [magi1] INFO — Loading model: /opt/magi/models/celebi.tflite
+magi1_celebi   | [mock_tflite] Interpreter stub for 'celebi'
+magi1_celebi   | [magi1] INFO — Celebi ready — input 320x320, conf≥0.4
+magi2_gengar  | [magi2] INFO — Gengar ready — input 224x224
+magi3_lugia     | [magi3] INFO — Lugia ready — fusion engine active
+magi3_lugia     | [magi3] INFO — Decision → TRACK (priority=4) | Tracking 3 object(s)
 ```
 
 ---
@@ -90,7 +90,7 @@ magi3_caspar     | [magi3] INFO — Decision → TRACK (priority=4) | Tracking 3
 |------|-----------|
 | `smbus2` | MPU-6050 IMU: sine-wave accel (±0.05g), small gyro drift |
 | `pigpio` | GPIO interrupts fire randomly every 15–30 seconds |
-| `tflite_runtime` | Melchior: 3 random detections (person, cat, car). Balthasar: random scene. |
+| `tflite_runtime` | Celebi: 3 random detections (person, cat, car). Gengar: random scene. |
 | `posix_ipc` | In-process bytearray (no real POSIX shm needed) |
 | `spidev` | Returns zeros |
 | `RPi.GPIO` | Silent no-op |
@@ -148,9 +148,9 @@ docker/
 │       └── interpreter.py       Returns realistic fake model outputs
 │
 └── dummy_models/
-    ├── melchior.tflite           16-byte placeholder (mock ignores content)
-    ├── balthasar.tflite
-    └── caspar.tflite
+    ├── celebi.tflite           16-byte placeholder (mock ignores content)
+    ├── gengar.tflite
+    └── lugia.tflite
 ```
 
 ---

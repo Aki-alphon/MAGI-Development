@@ -103,7 +103,7 @@ async def predict_canopy(file: UploadFile = File(...)):
 
     Returns:
         JSON with tile grid, vegetation coverage, mean health,
-        stress distribution, and recommended Caspar action.
+        stress distribution, and recommended Lugia action.
     """
     try:
         contents = await file.read()

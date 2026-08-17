@@ -134,7 +134,7 @@ class MAGITrainPipeline:
     def run_pipeline(self) -> None:
         """Execute the full training pipeline."""
         logging.info("╔" + "═" * 58 + "╗")
-        logging.info("║   MAGI VISION TRAINING PIPELINE — MELCHIOR MODEL        ║")
+        logging.info("║   MAGI VISION TRAINING PIPELINE — CELEBI MODEL        ║")
         logging.info("╚" + "═" * 58 + "╝")
 
         try:

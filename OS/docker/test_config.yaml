@@ -76,21 +76,23 @@ sensors:
 
 models:
   magi1:
-    name: "Melchior"
-    role: "detection"
-    path: "/opt/magi/models/melchior.tflite"   # ← Mock interpreter ignores path
-    input_size: [320, 320]
+    name: "Celebi"
+    role: "plant_health"
+    path: "/opt/magi/models/celebi.tflite"   # ← Mock interpreter ignores path
+    input_size: [224, 224]
+    input_channels: 6
     input_dtype: "float32"
-    confidence_threshold: 0.4
-    nms_threshold: 0.4
     num_threads: 1
-    use_xnnpack: false        # No XNNPACK in Docker
+    use_xnnpack: false          # No XNNPACK in Docker
     inference_timeout_ms: 200
+    subsample_every: 2          # Faster cycles in Docker testing
+    plant_timeout_s: 99999.0    # Never auto-sleep in Docker (no scene from Gengar)
+    start_active: true          # ← Boot straight into ACTIVE for Docker testing
 
   magi2:
-    name: "Balthasar"
+    name: "Gengar"
     role: "analysis"
-    path: "/opt/magi/models/balthasar.tflite"
+    path: "/opt/magi/models/gengar.tflite"
     input_size: [224, 224]
     input_dtype: "float32"
     num_threads: 1
@@ -98,9 +100,9 @@ models:
     inference_timeout_ms: 150
 
   magi3:
-    name: "Caspar"
+    name: "Lugia"
     role: "fusion"
-    path: "/opt/magi/models/caspar.tflite"
+    path: "/opt/magi/models/lugia.tflite"
     input_size: [128]
     input_dtype: "float32"
     num_threads: 1
@@ -108,7 +110,7 @@ models:
     inference_timeout_ms: 50
 
 camera:
-  enabled: false             # Set true to enable mock camera frames
+  enabled: true              # ← Enable mock frame generation for testing
   source: 0
   width: 640
   height: 480

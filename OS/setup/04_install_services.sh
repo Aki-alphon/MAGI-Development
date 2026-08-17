@@ -30,7 +30,7 @@ touch "$MAGI_DIR/src/magi3/__init__.py"
 
 # ── Create placeholder model files (replace with real .tflite) ──
 echo "[MAGI] Checking model directory..."
-for model in melchior balthasar caspar; do
+for model in celebi gengar lugia; do
     path="$MAGI_DIR/models/${model}.tflite"
     if [ ! -f "$path" ]; then
         echo "  WARNING: $path not found — place your TFLite model there"

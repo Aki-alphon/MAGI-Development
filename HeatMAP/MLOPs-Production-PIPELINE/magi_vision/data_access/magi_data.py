@@ -151,13 +151,20 @@ class MAGIDataLoader:
         Returns:
             path to extracted dataset directory
         """
+        import subprocess
         try:
             os.makedirs(destination, exist_ok=True)
-            os.system(
-                f"kaggle datasets download -d {dataset_name} "
-                f"-p {destination} --unzip && rm -f {destination}/*.zip"
-            )
+            cmd = f"kaggle datasets download -d {dataset_name} -p {destination} --unzip"
+            logging.info(f"Running command: {cmd}")
+            subprocess.run(cmd, shell=True, check=True)
+            
+            # Clean up zip file if it exists
+            subprocess.run(f"rm -f {destination}/*.zip", shell=True, check=False)
+            
             logging.info(f"Kaggle dataset '{dataset_name}' downloaded to {destination}")
             return destination
+        except subprocess.CalledProcessError as e:
+            msg = f"Kaggle download failed. Do you have your Kaggle credentials (~/.kaggle/kaggle.json) configured in Colab? Error: {e}"
+            raise MAGIVisionException(msg, sys) from e
         except Exception as e:
             raise MAGIVisionException(e, sys) from e

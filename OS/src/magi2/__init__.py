@@ -1,1 +1,1 @@
-# MAGI-2 Balthasar package
+# MAGI-2 Gengar package

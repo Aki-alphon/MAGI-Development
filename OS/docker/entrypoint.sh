@@ -48,19 +48,19 @@ case "$1" in
         exec python3 /opt/magi/src/sensors/camera_capture.py
         ;;
     magi1)
-        echo "[MAGI] Launching MAGI-1 Melchior (Detection)..."
+        echo "[MAGI] Launching MAGI-1 Celebi (Detection)..."
         sleep 4   # Wait for sensor_hub to be ready
-        exec python3 /opt/magi/src/magi1/melchior.py
+        exec python3 /opt/magi/src/magi1/celebi.py
         ;;
     magi2)
-        echo "[MAGI] Launching MAGI-2 Balthasar (Analysis)..."
+        echo "[MAGI] Launching MAGI-2 Gengar (Analysis)..."
         sleep 4
-        exec python3 /opt/magi/src/magi2/balthasar.py
+        exec python3 /opt/magi/src/magi2/gengar.py
         ;;
     magi3)
-        echo "[MAGI] Launching MAGI-3 Caspar (Fusion)..."
+        echo "[MAGI] Launching MAGI-3 Lugia (Fusion)..."
         sleep 7   # Wait for magi1 + magi2
-        exec python3 /opt/magi/src/magi3/caspar.py
+        exec python3 /opt/magi/src/magi3/lugia.py
         ;;
     monitor)
         echo "[MAGI] Launching Status Monitor..."

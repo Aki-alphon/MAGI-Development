@@ -28,9 +28,9 @@ def make_dummy_tflite(path: str, note: str = ""):
 
 if __name__ == "__main__":
     models = {
-        "melchior.tflite":  "(replace with YOLOv8-nano or MobileNet-SSD TFLite)",
-        "balthasar.tflite": "(replace with EfficientNet-Lite TFLite)",
-        "caspar.tflite":    "(replace with custom LSTM TFLite or leave for rule engine)",
+        "celebi.tflite":  "(replace with YOLOv8-nano or MobileNet-SSD TFLite)",
+        "gengar.tflite": "(replace with EfficientNet-Lite TFLite)",
+        "lugia.tflite":    "(replace with custom LSTM TFLite or leave for rule engine)",
     }
     for fname, note in models.items():
         make_dummy_tflite(os.path.join(OUTPUT_DIR, fname), note)

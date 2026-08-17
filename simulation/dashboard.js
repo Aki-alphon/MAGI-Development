@@ -16,8 +16,8 @@ window.addEventListener('DOMContentLoaded', () => {
     // 1. Main simulator
     simVisualizer  = new MagiVisualizer('canvas-container');
     gaitController = new GaitGenerator(simVisualizer);
-    decisionEngine = new CasparDecisionEngine(gaitController);
-    decisionEngine.setConsole('caspar-console');
+    decisionEngine = new LugiaDecisionEngine(gaitController);
+    decisionEngine.setConsole('lugia-console');
 
     // 2. RL Training sandbox (minimal — no CoM/poly)
     trainVisualizer = new MagiVisualizer('train-canvas-container', true);
@@ -423,7 +423,7 @@ function runMainLoop() {
     lastFrameTime = now;
 
     if (activeTab === 'simulation' || activeTab === 'fusion') {
-        // Caspar decision fusion at ~50Hz
+        // Lugia decision fusion at ~50Hz
         if (Math.random() < 0.25) decisionEngine.evaluateRules();
 
         // Tick gait and pass swing flags to visualiser

@@ -72,12 +72,12 @@ services:
       - sensor_hub
     restart: "no"
 
-  # ── MAGI-1 Melchior ───────────────────────────────────────────────────────
+  # ── MAGI-1 Celebi ───────────────────────────────────────────────────────
   magi1:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: magi1_melchior
+    container_name: magi1_celebi
     command: ["magi1"]
     volumes:
       - magi_logs:/opt/magi/logs
@@ -91,12 +91,12 @@ services:
       - sensor_hub
     restart: unless-stopped
 
-  # ── MAGI-2 Balthasar ──────────────────────────────────────────────────────
+  # ── MAGI-2 Gengar ──────────────────────────────────────────────────────
   magi2:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: magi2_balthasar
+    container_name: magi2_gengar
     command: ["magi2"]
     volumes:
       - magi_logs:/opt/magi/logs
@@ -110,12 +110,12 @@ services:
       - sensor_hub
     restart: unless-stopped
 
-  # ── MAGI-3 Caspar ─────────────────────────────────────────────────────────
+  # ── MAGI-3 Lugia ─────────────────────────────────────────────────────────
   magi3:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: magi3_caspar
+    container_name: magi3_lugia
     command: ["magi3"]
     ports:
       - "5558:5558"     # Expose decision PUB socket
