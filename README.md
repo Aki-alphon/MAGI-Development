@@ -179,11 +179,10 @@ MAGI/
 │   └── MAGI.3mf                  Full assembly CAD project
 │
 ├── HeatMAP/                      ML preprocessing evaluation dashboard
-│   ├── visauls.py                Streamlit app (CLAHE, confusion matrix)
-│   └── Heatmap_algo.ipynb        Baseline spectral heatmap algorithm
-│
-└── Research paper/               IEEE-format research paper (LaTeX)
-    └── main.tex                  Full paper source
+   ├── visauls.py                Streamlit app (CLAHE, confusion matrix)
+   └── Heatmap_algo.ipynb        Baseline spectral heatmap algorithm
+
+
 ```
 
 ---
