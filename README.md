@@ -6,6 +6,14 @@
 
 **A 12-DOF Quadruped Robot with Edge AI, Custom OS, and Evolutionary Gait Training**
 
+<div align="center">
+  <img src="model%20%26%20miscellenious/assets/magi_quadruped.jpg"
+       alt="MAGI Quadruped Robot"
+       width="850">
+
+  <p><b>12-DOF Autonomous Quadruped Robot</b></p>
+</div>
+
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 [![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%204B-c51a4a.svg)](#hardware-overview)
 [![MCU](https://img.shields.io/badge/MCU-ESP32-orange.svg)](#firmware--esp32-joint-controller)
