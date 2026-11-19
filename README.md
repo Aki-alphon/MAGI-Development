@@ -7,7 +7,7 @@
 **A 12-DOF Quadruped Robot with Edge AI, Custom OS, and Evolutionary Gait Training**
 
 <div align="center">
-  <img src="model%20%26%20miscellenious/assets/magi_quadruped.jpg"
+  <img src="model &miscellenious/assets/magi_quadruped.jpg"
        alt="MAGI Quadruped Robot"
        width="850">
 
